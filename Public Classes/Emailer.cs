@@ -29,7 +29,7 @@ namespace Chnage.Public_Classes
             var message = new MimeMessage();
             var messageBody = new BodyBuilder();
             string subject = "Notification for " + ChangeType + " - " + ChangeId;
-            message.From.Add(new MailboxAddress("Engineering Change Notifications", "notificationsender@geotab.com"));
+            message.From.Add(new MailboxAddress("Engineering Change Notifications", "notificationsender@gmail.com"));
             message.To.Add(new MailboxAddress(toName, toEmail));
             string header = "<div style='color:darkblue'>" +
                         "<h2>" +

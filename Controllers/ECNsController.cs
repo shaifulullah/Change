@@ -77,7 +77,7 @@ namespace MyECO.Controllers
             {
                 if (User.Identity.IsAuthenticated)
                 {
-                    string geotabDomain = "geotab.com";
+                    string geotabDomain = "gmail.com";
                     string userEmail = (User.Identity as System.Security.Claims.ClaimsIdentity)?.Claims.ElementAt(2).Value;
                     string[] x = userEmail.Split("@");
                     string userEmailDomain = x[1];
