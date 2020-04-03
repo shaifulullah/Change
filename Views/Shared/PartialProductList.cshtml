@@ -32,6 +32,25 @@
 <div class="row">
     <div class="col-md-12">
         <h3>Selected Products:</h3>
+        <div class="hidden" id="selectedProductsDiv">
+            <label id="selectedlabel"></label>
+            <ul class="list-inline">
+                <li class="prodList" style="border: 1px solid rgba(9, 0, 90, 0.75);border-radius: 4px;padding: 6px 12px; margin:5px;">
+                    <label id="innerLabel">
+
+                    </label>
+                    <span class="btn glyphicon glyphicon-ok" title="Select All/None" onclick="$(this).children(':checkbox').click()"><input type="checkbox" class="hidden btnFamilyAll" /></span>
+                    <span>
+                        &nbsp;
+                    </span>
+                    <span class="btn glyphicon glyphicon glyphicon-retweet" onclick="$(this).children(':checkbox').click()" title="Reverse Selection"><input type="checkbox" class="hidden btnFamilyInvert" /></span>
+                    <div>
+                        <ul class="list-inline" id="selectedProducts">
+                        </ul>
+                    </div>
+                </li>
+            </ul>
+        </div>
         <div class="hidden" id="searchProducts">
             <label id="label"></label>
             <ul class="list-inline">
@@ -145,8 +164,30 @@
 
                 if (response != null) {
                     $('#label, #innerLabel').empty();
+                    var allListItems = $('#searchedProducts > li');
+                    //var checkedItems = $('#searchedProducts').find("input:checked");
                     $('#searchedProducts').empty();
+                    //$('#selectedProducts').empty();
                     $('#label').append('Search Result for: ' + $('#searchText').val());
+                    
+
+                    $.each(allListItems, function () {
+                        var ischecked = false;
+                        try {
+                            ischecked = $(this).find("input:checked")[0].checked;
+                            if (ischecked) {
+                                $('#selectedProducts').append(this);
+                            }
+                        } catch (e) {
+
+                        }
+                    });
+
+                    if ($('#selectedProducts li').length > 0) {
+                        $('#selectedProductsDiv').removeClass('hidden');
+                    }
+
+
                     //$('#innerLabel').append($('#searchText').val());
                     $(response.result).each(function (i, item) {
                         console.log(i);
