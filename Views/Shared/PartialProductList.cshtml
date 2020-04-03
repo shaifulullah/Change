@@ -1,7 +1,18 @@
 ﻿@model Dictionary<string, Dictionary<string, Dictionary<Product, bool>>>
-
 <div class="row">
     <div class="col-md-12">
+        <br />
+        <div class="row">
+            <div class="col-md-3">
+                <input type="text" name="name" class="form-control" id="searchText" />
+            </div>
+            <div class="col-md-1">
+                <input type="button" value="Search" class="btn btn-info" id="searchBtn" />
+            </div>
+            <div class="col-md-2">
+                <input type="button" value="Clear Search" class="btn btn-warning" id="clearBtn" />
+            </div>
+        </div>
         <h3>
             Categories:
         </h3>
@@ -21,6 +32,25 @@
 <div class="row">
     <div class="col-md-12">
         <h3>Selected Products:</h3>
+        <div class="hidden" id="searchProducts">
+            <label id="label"></label>
+            <ul class="list-inline">
+                <li class="prodList" style="border: 1px solid rgba(9, 0, 90, 0.75);border-radius: 4px;padding: 6px 12px; margin:5px;">
+                    <label id="innerLabel">
+
+                    </label>
+                    <span class="btn glyphicon glyphicon-ok" title="Select All/None" onclick="$(this).children(':checkbox').click()"><input type="checkbox" class="hidden btnFamilyAll" /></span>
+                    <span>
+                        &nbsp;
+                    </span>
+                    <span class="btn glyphicon glyphicon glyphicon-retweet" onclick="$(this).children(':checkbox').click()" title="Reverse Selection"><input type="checkbox" class="hidden btnFamilyInvert" /></span>
+                    <div>
+                        <ul class="list-inline" id="searchedProducts">
+                        </ul>
+                    </div>
+                </li>
+            </ul>
+        </div>
         @foreach (var categories in Model)
         {
             <div class="hidden" name="@categories.Key">
@@ -54,6 +84,11 @@
                         <li>
                             <span class="btn btn-default selectDevices">
                                 GR8
+                            </span>
+                        </li>
+                        <li>
+                            <span class="btn btn-default selectDevices">
+                                GP9
                             </span>
                         </li>
                     </ul>
@@ -92,8 +127,49 @@
         }
     </div>
 </div>
-
 <script>
+    $('#clearBtn').click(function () {
+        $('#searchedProducts').empty();
+        $('#searchProducts').addClass('hidden');
+        $('#searchText').val('');
+    })
+    $('#searchBtn').click(function () {
+        $.ajax({
+            url: '/ECOs/Search',
+            type: 'get',
+            data: {
+                searchTerm: $('#searchText').val()
+            },
+            success: function (response) {
+                var div = $('#searchProducts');
+
+                if (response != null) {
+                    $('#label, #innerLabel').empty();
+                    $('#searchedProducts').empty();
+                    $('#label').append('Search Result for: ' + $('#searchText').val());
+                    //$('#innerLabel').append($('#searchText').val());
+                    $(response.result).each(function (i, item) {
+                        console.log(i);
+                       var liInput = "<li style='padding:5px;'>"+
+                                                "<label class='btn btn-default'>"+
+                                                    "<input class='checkboxProduct' type='checkbox' value='"+  item.id  +"' name='AffectedProductsIds'/>"+
+                                                    "<span style='padding:5px;'>"+
+                                                       item.name
+                                                    +"</span>"+
+                                                "</label>"+
+                                            "</li>";
+                        $('#searchedProducts').append(liInput);
+                    })
+                    if (div.hasClass('hidden')) {
+                        div.removeClass('hidden');
+                    }
+                }
+            },
+            error: function (errorMsg) {
+                alert(errorMsg.responseText);
+            }
+        })
+    })
     $(function () {
         var HiddenDiv = $(".checkboxProduct:checked").parents(".hidden");
         HiddenDiv.removeClass("hidden");
@@ -101,3 +177,137 @@
         CategoryCheckBox.attr("checked", true).change();
     })
 </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@*@model Dictionary<string, Dictionary<string, Dictionary<Product, bool>>>
+
+    <div class="row">
+        <div class="col-md-12">
+            <h3>
+                Categories:
+            </h3>
+            <ul class="list-inline">
+                @foreach (var category in Model)
+                {
+                    <li>
+                        <label class="btn btn-primary" style="margin-bottom:5px;">
+                            <input type="checkbox" name="@category.Key" class="btnCategory" />
+                            @category.Key
+                        </label>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            <h3>Selected Products:</h3>
+            @foreach (var categories in Model)
+            {
+                <div class="hidden" name="@categories.Key">
+                    <label>@categories.Key</label>
+                    @if (categories.Key.Contains("Devices"))
+                    {
+                        <ul class="list-inline">
+                            <li>
+                                <span>Select All:</span>
+                            </li>
+                            <li>
+                                <span class="btn btn-default selectDevices">
+                                    GO7
+                                </span>
+                            </li>
+                            <li>
+                                <span class="btn btn-default selectDevices">
+                                    GO8
+                                </span>
+                            </li>
+                            <li>
+                                <span class="btn btn-default selectDevices">
+                                    GO9
+                                </span>
+                            </li>
+                            <li>
+                                <span class="btn btn-default selectDevices">
+                                    GR7
+                                </span>
+                            </li>
+                            <li>
+                                <span class="btn btn-default selectDevices">
+                                    GR8
+                                </span>
+                            </li>
+                        </ul>
+                    }
+                    <ul class="list-inline">
+                        @foreach (var family in categories.Value)
+                        {
+                            <li class="prodList" style="border: 1px solid rgba(9, 0, 90, 0.75);border-radius: 4px;padding: 6px 12px; margin:5px;">
+                                <label>
+                                    @family.Key
+                                </label>
+                                <span class="btn glyphicon glyphicon-ok" title="Select All/None" onclick="$(this).children(':checkbox').click()"><input type="checkbox" class="hidden btnFamilyAll" /></span>
+                                <span>
+                                    &nbsp;
+                                </span>
+                                <span class="btn glyphicon glyphicon glyphicon-retweet" onclick="$(this).children(':checkbox').click()" title="Reverse Selection"><input type="checkbox" class="hidden btnFamilyInvert" /></span>
+                                <div>
+                                    <ul class="list-inline">
+                                        @foreach (var product in family.Value)
+                                        {
+                                            <li style="padding:5px;">
+                                                <label class="btn btn-default">
+                                                    <input class="checkboxProduct" type="checkbox" value="@product.Key.Id" name="AffectedProductsIds" checked="@product.Value" />
+                                                    <span>
+                                                        @product.Key.Name.Trim()
+                                                    </span>
+                                                </label>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+
+    <script>
+        $(function () {
+            var HiddenDiv = $(".checkboxProduct:checked").parents(".hidden");
+            HiddenDiv.removeClass("hidden");
+            var CategoryCheckBox = $("input[name='" + HiddenDiv.attr("name") + "'");
+            CategoryCheckBox.attr("checked", true).change();
+        })
+    </script>*@

@@ -144,7 +144,7 @@ namespace Chnage.Controllers
         {
             bool isUserInNotification = false;
             var loggedInUser = GetLoggedInUser();
-            if (loggedInUser!= null && eco.Notifications != null)
+            if (loggedInUser != null && eco.Notifications != null)
             {
                 foreach (var user in eco.Notifications)
                 {
@@ -2632,7 +2632,18 @@ namespace Chnage.Controllers
 
         }
         #endregion
-
+        public ActionResult Search(string searchTerm)
+        {
+            if (searchTerm != null)
+            {
+                var result = _context.Products.Where(p => p.Name.ToLower().Contains(searchTerm.ToLower())).ToList();
+                return Json(new { result });
+            }
+            else
+            {
+                return NotFound("Search string can not be empty");
+            }
+        }
 
     }
 }
