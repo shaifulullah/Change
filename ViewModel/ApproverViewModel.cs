@@ -11,5 +11,6 @@ namespace Chnage.ViewModel
         public int UserRoleId { get; set; }
         public int ChangeId { get; set; }
         public string RejectReason { get; set; }
+        public string ApproverNote { get; set; }
     }
 }

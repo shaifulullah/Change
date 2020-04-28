@@ -35,6 +35,9 @@ namespace Chnage.ViewModel.ECN
             OriginatorId = ecn.OriginatorId;
             Status = ecn.Status;
             NewFirmwareVersion = ecn.NewFirmwareVersion;
+            DeviationSelected = ecn.DeviationSelected;
+            DeviationQuantity = ecn.DeviationQuantity;
+            DeviationDate = ecn.DeviationDate;
         }
         public int Id { get; set; }
         [Display(Name = "Model Name"), Required]
@@ -56,9 +59,9 @@ namespace Chnage.ViewModel.ECN
         public int ChangeTypeId { get; set; }
         [Display(Name = "PTCRB Resubmission Required"), Required]
         public bool PTCRBResubmissionRequired { get; set; }
-        [Display(Name = "Current Firmware Version"), Required]
+        [Display(Name = "Current Revision"), Required]
         public string CurrentFirmwareVersion { get; set; }
-        [Display(Name = "New Firmware Version"), Required]
+        [Display(Name = "New Revision"), Required]
         public string NewFirmwareVersion { get; set; }
         [Required]
         public string Description { get; set; }
@@ -76,5 +79,12 @@ namespace Chnage.ViewModel.ECN
         public List<int> RelatedECOIds { get; set; }
 
         public virtual ICollection<ECNHasECO> ECNHasECOs { get; set; } //This property used to get related ECO details for findChnages function
+
+        [Display(Name = "Deviation")]
+        public bool DeviationSelected { get; set; }
+        [Display(Name = "Deviation Quantity")]
+        public int? DeviationQuantity { get; set; }
+        [Display(Name = "Deviation End Date")]
+        public DateTime? DeviationDate { get; set; }
     }
 }

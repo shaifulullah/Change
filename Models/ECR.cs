@@ -1,4 +1,5 @@
 ﻿using Chnage.CustomAttributes;
+using Chnage.Models;
 using Chnage.ViewModel.ECR;
 using System;
 using System.Collections.Generic;
@@ -36,6 +37,9 @@ namespace Chnage.Models
             PreviousRevision = vm.PreviousRevision;
             NewRevision = vm.NewRevision;
             Status = vm.Status;
+            DeviationSelected = vm.DeviationSelected;
+            DeviationQuantity = vm.DeviationQuantity;
+            DeviationDate = vm.DeviationDate;
         }
 
         [Key]
@@ -112,6 +116,19 @@ namespace Chnage.Models
         public Dictionary<string, string> LinkUrls { get; set; }
         public List<AuditLog> AuditLogs { get; set; }
         public string RejectReason { get; set; }
+        [NotMapped]
+        [Display(Name = "Add user to notification list")]
+        public List<int> UsersToBeAddedInNotification { get; set; }
+        [NotMapped]
+        public PartialViewAffectedProductsECR PartialViewAffectedProductsECR { get; set; }
+
+        [Display(Name = "Deviation")]
+        public bool DeviationSelected { get; set; }
+        [Display(Name = "Deviation Quantity")]
+        public int? DeviationQuantity { get; set; }
+        [Display(Name = "Deviation End Date")]
+        [DisplayFormat(DataFormatString = "{0:yyyy/MM/dd}")]
+        public DateTime? DeviationDate { get; set; }
     }
     public class ECRHasECO
     {
@@ -132,19 +149,39 @@ public enum StatusOptions
 {
     [Display(Name = "Draft")]
     Draft,
-    [Display(Name = "Rejected Validation")]
+    [Display(Name = "Rejected")]
     RejectedValidation,
-    [Display(Name = "Rejected Approval")]
+    [Display(Name = "Rejected")]
     RejectedApproval,
     [Display(Name = "Awaiting Approval")]
     AwaitingApproval,
     [Display(Name = "Approved")]
-    Approved
+    Approved,
+    [Display(Name = "Templates")]
+    Template,
+    [Display(Name = "Delete")]
+    Delete,
+    [Display(Name = "Awaiting Validation")]
+    AwaitingValidation
 }
 public enum ImpType
 {
     [Display(Name = "New Production")]
     NewProduction = 0,
     [Display(Name = "Rework All")]
-    ReworkAll = 1
+    ReworkAll = 1,
+    [Display(Name = "Running Change")]
+    RunningChange = 2
+}
+public class PartialViewAffectedProductsECR
+{
+    public PartialViewAffectedProductsECR()
+    {
+        AffectedProducts = new List<ProductECR>();
+        NotAffectedProducts = new List<Product>();
+        Print = false;
+    }
+    public virtual ICollection<ProductECR> AffectedProducts { get; set; }
+    public virtual ICollection<Product> NotAffectedProducts { get; set; }
+    public bool Print { get; set; }
 }

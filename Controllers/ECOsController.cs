@@ -139,24 +139,42 @@ namespace Chnage.Controllers
         #endregion
 
         #region Checks
-
-        public bool CheckIfUserInNotificationList(ECO eco)
+        public bool CheckIfUserIsAlreadyInNotificationList(ECO eco, int userId)
         {
             bool isUserInNotification = false;
-            var loggedInUser = GetLoggedInUser();
-            if (loggedInUser != null && eco.Notifications != null)
+            if (eco != null)
             {
                 foreach (var user in eco.Notifications)
                 {
-                    if (user.UserId == loggedInUser.Id)
+                    if (user.UserId == userId)
                     {
                         isUserInNotification = true;
                     }
-
                 }
             }
             return isUserInNotification;
         }
+        public bool CheckIfUserInNotificationList(ECO eco)
+        {
+            bool isUserInNotification = false;
+            if (loggedUser != null)
+            {
+                if (eco.Notifications != null)
+                {
+                    foreach (var user in eco.Notifications)
+                    {
+                        if (user.UserId == loggedUser.Id)
+                        {
+                            isUserInNotification = true;
+                        }
+
+                    }
+                }
+                return isUserInNotification;
+            }
+            return false;
+        }
+
         /// <summary>
         /// Checks if the current user is an approver for the current ECO.
         /// </summary>
@@ -244,7 +262,7 @@ namespace Chnage.Controllers
         {
             bool rejected = false;
             var isRejected = _context.ECOs.Where(eco => eco.Id == id).Select(r => r.Status).FirstOrDefault();
-            if (isRejected == StatusOptions.RejectedApproval)
+            if (isRejected == StatusOptions.RejectedApproval || isRejected == StatusOptions.RejectedValidation)
             {
                 rejected = true;
             }
@@ -278,6 +296,34 @@ namespace Chnage.Controllers
                         .ThenInclude(a => a.Product)
                     .FirstOrDefaultAsync(m => m.Id == id); //gets all the related information from the connecting tables
 
+                if (eCO == null)
+                {
+                    return NotFound();
+                }
+
+                var users = _context.Users.Where(ur => ur.isActive).OrderBy(ur => ur.Name);
+                List<User> usersForNotification = new List<User>();
+
+                try
+                {
+                    if (users != null)
+                    {
+                        foreach (User user in users)
+                        {
+                            var isUserInNotificationList = CheckIfUserIsAlreadyInNotificationList(eCO, user.Id);
+                            if (!isUserInNotificationList)
+                            {
+                                usersForNotification.Add(user);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ViewModelError vm = SetViewModelError(ex);
+                    return RedirectToAction("ErrorPage", "ErrorHandler", vm);
+                }
+
                 bool loggedUserIsApprover = CheckLoggedUserIsApprover(eCO.Id);
                 bool loggedUserIsValidator = CheckLoggedUserIsValidator(eCO.Id);
                 bool loggedUserIsOriginator = CheckLoggedUserIsOriginator(eCO.Id);
@@ -290,11 +336,16 @@ namespace Chnage.Controllers
                 ViewData["LoggedUserIsApprover"] = loggedUserIsApprover;
                 ViewData["LoggedUserIsOriginator"] = loggedUserIsOriginator;
                 ViewData["ECOWasRejected"] = wasRejected;
+                ViewData["AllUsers"] = new SelectList(usersForNotification, "Id", "Name");
                 ViewData["IsUserInNotificatonList"] = isUserInNotification;
 
                 if (!string.IsNullOrWhiteSpace(TempData["ReminderEmailConfirmation"] as string))
                 {
                     ViewData["ReminderEmailConfirmation"] = TempData["ReminderEmailConfirmation"];
+                }
+                if (!string.IsNullOrWhiteSpace(TempData["RejectReasonEmpty"] as string))
+                {
+                    ViewData["RejectReasonEmpty"] = TempData["RejectReasonEmpty"];
                 }
 
                 List<ECR> relatedECRs = new List<ECR>();
@@ -304,468 +355,6 @@ namespace Chnage.Controllers
                 }
 
                 ViewData["ECRs"] = relatedECRs; //simple viewbag for the relatedECOs Partial.
-
-                #region Populate Audit View
-
-                List<Audit> logsFromAuditTable = new List<Audit>();
-                var logId = eCO.Id;
-
-                #region Audit - Get ECO Table
-
-                var logList = _context.Audits.Where(e => e.TableName == "ECOs" && e.EntityId == logId.ToString()).ToList()
-                            .Where(g => g.OldData != g.NewData);
-
-                foreach (var log in logList)
-                {
-                    if (log.TableName == "ECOs")
-                    {
-                        if (log.OldData == null && log.NewData != null)
-                        {
-                            List<string> ecoLog = new List<string>();
-                            var newData = JsonConvert.DeserializeObject<ECO>(log.NewData);
-
-                            if (newData.ChangeTypeId != -1)
-                            {
-                                var changedType = _context.RequestTypes.Where(i => i.Id == newData.ChangeTypeId).Select(i => i.Name).FirstOrDefault();
-                                ecoLog.Add("ChangeType:" + changedType);
-                            }
-                            else
-                            { ecoLog.Add("ChangeType:null"); }
-
-                            if (newData.LinkUrls != null)
-                            {
-                                foreach (var links in newData.LinkUrls)
-                                {
-                                    ecoLog.Add("LinkUrl:" + links.Value.ToString());
-                                }
-                            }
-                            else
-                            { ecoLog.Add("LinkUrl:null"); }
-
-                            if (newData.NotesForApprover != null)
-                            {
-                                foreach (var notes in newData.NotesForApprover)
-                                {
-                                    ecoLog.Add("NotesForApprover:" + notes);
-                                }
-                            }
-                            else
-                            { ecoLog.Add("NotesForApprover:null"); }
-
-                            if (newData.NotesForValidator != null)
-                            {
-                                foreach (var notes in newData.NotesForValidator)
-                                {
-                                    ecoLog.Add("NotesForValidator:" + notes);
-                                }
-                            }
-                            else
-                            { ecoLog.Add("NotesForValidator:null"); }
-
-                            if (newData.OriginatorId != -1)
-                            {
-                                var originatorName = _context.Users.Where(u => u.Id == newData.OriginatorId).Select(u => u.Name).FirstOrDefault();
-                                ecoLog.Add("OriginatorName:" + originatorName);
-                            }
-                            else
-                            { ecoLog.Add("OriginatorName:null"); }
-
-                            log.NewData = Helper.GetStructuredJsonInfo(newData);
-                            log.NewData += string.Join("<br/>", ecoLog);
-
-                        }
-                        if (log.Action == EntityState.Modified.ToString())
-                        {
-                            List<string> oldECOlog = new List<string>();
-                            List<string> newECOlog = new List<string>();
-                            var oldData = JsonConvert.DeserializeObject<ECO>(log.OldData);
-                            var newData = JsonConvert.DeserializeObject<ECO>(log.NewData);
-
-                            var changedColumns = log.ChangedColumns.Split(',').ToList();
-
-                            if (changedColumns.Contains("LinkUrls"))
-                            {
-                                if (newData.LinkUrls != null)
-                                {
-                                    foreach (var links in newData.LinkUrls)
-                                    {
-                                        newECOlog.Add("LinkUrl:" + links.Value.ToString());
-                                    }
-                                }
-                                else
-                                { newECOlog.Add("LinkUrl: "); }
-
-                                if (oldData.LinkUrls != null)
-                                {
-                                    foreach (var links in oldData.LinkUrls)
-                                    {
-                                        oldECOlog.Add("LinkUrl:" + links.Value.ToString());
-                                    }
-                                }
-                                else
-                                { oldECOlog.Add("LinkUrl: "); }
-                            }
-                            if (changedColumns.Contains("NotesForApprover"))
-                            {
-                                if (newData.NotesForApprover != null)
-                                {
-                                    foreach (var notes in newData.NotesForApprover)
-                                    {
-                                        newECOlog.Add("NotesForApprover:" + notes);
-                                    }
-                                }
-                                else
-                                { newECOlog.Add("NotesForApprover: "); }
-
-                                if (oldData.NotesForApprover != null)
-                                {
-                                    foreach (var notes in newData.NotesForApprover)
-                                    {
-                                        oldECOlog.Add("NotesForApprover:" + notes);
-                                    }
-                                }
-                                else
-                                { oldECOlog.Add("NotesForApprover: "); }
-                            }
-                            if (changedColumns.Contains("NotesForValidator"))
-                            {
-                                if (newData.NotesForValidator != null)
-                                {
-                                    foreach (var notes in newData.NotesForValidator)
-                                    {
-                                        newECOlog.Add("NotesForValidator:" + notes);
-                                    }
-                                }
-                                else
-                                { newECOlog.Add("NotesForValidator: "); }
-
-                                if (oldData.NotesForValidator != null)
-                                {
-                                    foreach (var notes in newData.NotesForValidator)
-                                    {
-                                        oldECOlog.Add("NotesForValidator:" + notes);
-                                    }
-                                }
-                                else
-                                { oldECOlog.Add("NotesForValidator: "); }
-                            }
-                            if (changedColumns.Contains("ChangeTypeId"))
-                            {
-                                if (newData.ChangeTypeId != -1)
-                                {
-                                    var changedType = _context.RequestTypes.Where(i => i.Id == newData.ChangeTypeId).Select(i => i.Name).FirstOrDefault();
-                                    newECOlog.Add("ChangeType:" + changedType);
-                                }
-                                else
-                                { newECOlog.Add("ChangeType: "); }
-
-                                if (oldData.ChangeTypeId != -1)
-                                {
-                                    var changedType = _context.RequestTypes.Where(i => i.Id == oldData.ChangeTypeId).Select(i => i.Name).FirstOrDefault();
-                                    oldECOlog.Add("ChangeType:" + changedType);
-                                }
-                                else
-                                { oldECOlog.Add("ChangeType: "); }
-                            }
-                            if (changedColumns.Contains("OriginatorId"))
-                            {
-                                if (newData.OriginatorId != -1)
-                                {
-                                    var originatorName = _context.Users.Where(u => u.Id == newData.OriginatorId).Select(u => u.Name).FirstOrDefault();
-                                    newECOlog.Add("OriginatorName:" + originatorName);
-                                }
-                                else
-                                { newECOlog.Add("OriginatorName: "); }
-
-                                if (oldData.OriginatorId != -1)
-                                {
-                                    var originatorName = _context.Users.Where(u => u.Id == oldData.OriginatorId).Select(u => u.Name).FirstOrDefault();
-                                    oldECOlog.Add("OriginatorName:" + originatorName);
-                                }
-                                else
-                                { oldECOlog.Add("OriginatorName: "); }
-                            }
-                            log.OldData = Helper.GetStructuredJsonInfo(oldData, changedColumns);
-                            log.NewData = Helper.GetStructuredJsonInfo(newData, changedColumns);
-
-                            log.OldData += string.Join("<br/>", oldECOlog);
-                            log.NewData += string.Join("<br/>", newECOlog);
-                        }
-                        log.TableName = "ECO";
-                    }
-
-                    logsFromAuditTable.Add(log);
-                }
-                #endregion
-
-                #region Audit - Get Related ECR
-                var relatedAuditECRs = _context.Audits.Where(e => e.TableName == "ECRHasECOs" && e.EntityId == logId.ToString()).ToList()
-                .Where(g => g.OldData != g.NewData).GroupBy(g => new
-                {
-                    g.EntityId,
-                    Date = g.CreatedOn.ToString("yyyy-MM-dd HH:mm:ss"),
-                    g.Action
-                }).Select(g => new { key = g.Key, value = g.ToList() });
-
-                foreach (var relatedAuditECR in relatedAuditECRs)
-                {
-                    foreach (var innerValue in relatedAuditECR.value)
-                    {
-                        if (innerValue.OldData != null)
-                        {
-                            var oldData = JsonConvert.DeserializeObject<ECRHasECO>(innerValue.OldData);
-                            var ecrName = _context.ECRs.Where(e => e.Id == oldData.ECRId).Select(e => e.Description).FirstOrDefault();
-                            innerValue.OldData = ecrName;
-                        }
-                        if (innerValue.NewData != null)
-                        {
-                            var newData = JsonConvert.DeserializeObject<ECRHasECO>(innerValue.NewData);
-                            var ecrName = _context.ECRs.Where(e => e.Id == newData.ECRId).Select(e => e.Description).FirstOrDefault();
-                            innerValue.NewData = ecrName;
-                        }
-                    }
-                    var relatedECRAudit = new Audit()
-                    {
-                        UserName = relatedAuditECR.value.FirstOrDefault().UserName,
-                        Action = relatedAuditECR.value.FirstOrDefault().Action,
-                        TableName = "Related ECR(s)",
-                        EntityId = relatedAuditECR.key.EntityId,
-                        OldData = string.Join("<br/>", relatedAuditECR.value.ToList().Where(g => g.OldData != null).Select(g => g.OldData)),
-                        NewData = string.Join("<br/>", relatedAuditECR.value.ToList().Where(g => g.NewData != null).Select(g => g.NewData)),
-                        CreatedOn = DateTime.Parse(relatedAuditECR.key.Date)
-                    };
-                    logsFromAuditTable.Add(relatedECRAudit);
-                }
-                #endregion
-
-                #region Audit - Get User Role Table
-
-                var userRoleECOLogList = _context.Audits.Where(e => e.TableName == "UserRoleECOs" && e.EntityId == logId.ToString()).ToList()
-                .Where(g => g.OldData != g.NewData).GroupBy(g => new
-                {
-                    g.EntityId,
-                    Date = g.CreatedOn.ToString("yyyy-MM-dd HH:mm:ss"),
-                    g.Action
-
-                }).Select(g => new { key = g.Key, value = g.ToList() });
-                foreach (var userRoleLog in userRoleECOLogList)
-                {
-                    foreach (var innerUserRoleLog in userRoleLog.value)
-                    {
-                        if (innerUserRoleLog.OldData != null)
-                        {
-                            var oldRequest = JsonConvert.DeserializeObject<UserRoleECO>(innerUserRoleLog.OldData);
-                            var userId = _context.UserRoles.Where(u => u.Id == oldRequest.UserRoleId).Select(u => u.UserId).FirstOrDefault();
-                            var userName = _context.Users.Where(u => u.Id == userId).Select(u => u.Name).FirstOrDefault();
-                            var requestTypeId = _context.UserRoles.Where(u => u.Id == oldRequest.UserRoleId).Select(u => u.RequestTypeId).FirstOrDefault();
-                            var affectedArea = _context.RequestTypes.Where(r => r.Id == requestTypeId).Select(r => r.Name).FirstOrDefault();
-                            var userRoleType = _context.UserRoles.Where(u => u.Id == oldRequest.UserRoleId).Select(u => u.RoleInt).FirstOrDefault();
-                            string approvalStatus;
-                            if (oldRequest.Approval == true)
-                            {
-                                approvalStatus = "Approved";
-                            }
-                            else if (oldRequest.Approval == false)
-                            {
-                                approvalStatus = "Rejected";
-                            }
-                            else
-                            {
-                                approvalStatus = "Waiting";
-                            }
-                            var stringBuils = (userName + "-" + userRoleType + " for " + affectedArea + " ; " + "Approval Status: " + approvalStatus);
-                            innerUserRoleLog.OldData = stringBuils;
-                        }
-                        if (innerUserRoleLog.NewData != null)
-                        {
-                            var newRequest = JsonConvert.DeserializeObject<UserRoleECO>(innerUserRoleLog.NewData);
-                            var userId = _context.UserRoles.Where(u => u.Id == newRequest.UserRoleId).Select(u => u.UserId).FirstOrDefault();
-                            var userName = _context.Users.Where(u => u.Id == userId).Select(u => u.Name).FirstOrDefault();
-                            var requestTypeId = _context.UserRoles.Where(u => u.Id == newRequest.UserRoleId).Select(u => u.RequestTypeId).FirstOrDefault();
-                            var affectedArea = _context.RequestTypes.Where(r => r.Id == requestTypeId).Select(r => r.Name).FirstOrDefault();
-                            var userRoleType = _context.UserRoles.Where(u => u.Id == newRequest.UserRoleId).Select(u => u.RoleInt).FirstOrDefault();
-                            string approvalStatus;
-                            if (newRequest.Approval == true)
-                            {
-                                approvalStatus = "Approved";
-                            }
-                            else if (newRequest.Approval == false)
-                            {
-                                approvalStatus = "Rejected";
-                            }
-                            else
-                            {
-                                approvalStatus = "Waiting";
-                            }
-                            var stringBuild = (userName + "-" + userRoleType + " for " + affectedArea + " ; " + "Approval Status: " + approvalStatus);
-                            innerUserRoleLog.NewData = stringBuild;
-                        }
-                    }
-                    var UserRoleAudit = new Audit()
-                    {
-                        UserName = userRoleLog.value.FirstOrDefault().UserName,
-                        Action = userRoleLog.value.FirstOrDefault().Action,
-                        TableName = "Approver",
-                        EntityId = userRoleLog.key.EntityId,
-                        OldData = string.Join("<br/>", userRoleLog.value.ToList().Where(g => g.OldData != null).Select(g => g.OldData)),
-                        NewData = string.Join("<br/>", userRoleLog.value.ToList().Where(g => g.NewData != null).Select(g => g.NewData)),
-                        CreatedOn = DateTime.Parse(userRoleLog.key.Date)
-                    };
-                    logsFromAuditTable.Add(UserRoleAudit);
-                }
-
-                #endregion 
-
-                #region Audit - Get Notification List
-                var notifications = _context.Notifications.Where(n => n.ECOId == logId).Select(x => x.Id.ToString()).ToList();
-                List<Audit> notificationLog = new List<Audit>();
-                var notificationList = _context.Audits.Where(x => notifications.Contains(x.EntityId) && x.TableName == "Notifications").ToList();
-
-                foreach (var notification in notificationList)
-                {
-
-                    if (notification.NewData != null)
-                    {
-                        var newNotification = JsonConvert.DeserializeObject<Notifications>(notification.NewData);
-                        var userName = _context.Users.Where(u => u.Id == newNotification.UserId).Select(u => u.Name).FirstOrDefault().ToString();
-                        notification.NewData = userName;
-                    }
-
-                    if (notification.OldData != null)
-                    {
-                        var oldNotification = JsonConvert.DeserializeObject<Notifications>(notification.OldData);
-                        var oldUserName = _context.Users.Where(u => u.Id == oldNotification.UserId).Select(u => u.Name).FirstOrDefault().ToString();
-                        notification.OldData = oldUserName;
-                    }
-
-                    notificationLog.Add(notification);
-                }
-                var groupNotifications = notificationLog.GroupBy(g => new { Date = g.CreatedOn.ToString("yyyy-MM-dd HH:mm:ss"), g.Action }).ToList();
-                List<Audit> notificationForAudit = new List<Audit>();
-                foreach (var groupNotification in groupNotifications)
-                {
-                    Audit notification = new Audit();
-                    notification.CreatedOn = DateTime.Parse(groupNotification.Key.Date);
-                    notification.UserName = groupNotification.FirstOrDefault().UserName;
-                    notification.Action = groupNotification.Key.Action;
-                    notification.OldData = string.Join("<br/>", groupNotification.Select(x => x.OldData));
-                    notification.NewData = string.Join("<br/>", groupNotification.Select(x => x.NewData));
-                    notification.TableName = groupNotification.FirstOrDefault().TableName;
-                    notificationForAudit.Add(notification);
-                }
-
-                //logList = logList.Concat(notificationForAudit).OrderBy(e=>e.Id);
-                logsFromAuditTable = logsFromAuditTable.Concat(notificationForAudit).ToList();
-
-                #endregion
-
-                #region Audit - Get Request Type ECO// Areas Effected
-
-                var requestTypeECO = _context.Audits.Where(e => e.TableName == "RequestTypeECOs" && e.EntityId == logId.ToString()).ToList()
-                        .Where(g => g.OldData != g.NewData).GroupBy(g => new
-                        {
-                            g.EntityId,
-                            Date = g.CreatedOn.ToString("yyyy-MM-dd HH:mm:ss"),
-                            g.Action
-                        }).Select(g => new { key = g.Key, value = g.ToList() });
-
-                foreach (var log in requestTypeECO)
-                {
-                    foreach (var innerLog in log.value)
-                    {
-                        if (innerLog.OldData != null)
-                        {
-                            var oldRequest = JsonConvert.DeserializeObject<RequestTypeECO>(innerLog.OldData);
-                            var oldRequestType = _context.RequestTypes.Where(r => r.Id == oldRequest.RequestTypeId).Select(r => r.Name).FirstOrDefault();
-                            innerLog.OldData = oldRequestType;
-                        }
-                        if (innerLog.NewData != null)
-                        {
-                            var newRequest = JsonConvert.DeserializeObject<RequestTypeECO>(innerLog.NewData);
-                            var newRequestType = _context.RequestTypes.Where(r => r.Id == newRequest.RequestTypeId).Select(r => r.Name).FirstOrDefault();
-                            innerLog.NewData = newRequestType;
-                        }
-                    }
-
-                    var Audit = new Audit()
-                    {
-                        UserName = log.value.FirstOrDefault().UserName,
-                        Action = log.value.FirstOrDefault().Action,
-                        TableName = "Affected Area(s)",
-                        EntityId = log.key.EntityId,
-                        OldData = (string.Join(",", log.value.ToList().Where(g => g.OldData != null).Select(g => g.OldData))),
-                        NewData = (string.Join(",", log.value.ToList().Where(g => g.NewData != null).Select(g => g.NewData))),
-                        CreatedOn = DateTime.Parse(log.key.Date)
-                    };
-                    logsFromAuditTable.Add(Audit);
-                }
-                #endregion
-
-                #region Audit - Get Affected Product List
-                var productECOLogList = _context.Audits.Where(e => e.TableName == "ProductECOs" && e.EntityId == logId.ToString()).ToList()
-                        .Where(g => g.OldData != g.NewData).GroupBy(g => new
-                        {
-                            g.EntityId,
-                            Date = g.CreatedOn.ToString("yyyy-MM-dd HH:mm:ss"),
-                            g.Action
-
-                        }).Select(g => new { key = g.Key, value = g.ToList() });
-
-                //.Select(x => new Audit { UserName = x.FirstOrDefault().UserName, Action = x.FirstOrDefault().Action, 
-                //    TableName = "ProductECO", EntityId = x.Key.EntityId, OldData = string.Join(":",x.ToList().Where(g=>g.OldData!=null).Select(g=>g.OldData)), 
-                //    NewData = string.Join(";",x.ToList().Select(g=>g.NewData)), CreatedOn = DateTime.Parse(x.Key.Date)}).ToList();
-                foreach (var log in productECOLogList)
-                {
-                    foreach (var innerLog in log.value)
-                    {
-                        if (innerLog.OldData != null)
-                        {
-                            var oldProduct = JsonConvert.DeserializeObject<ProductECO>(innerLog.OldData);
-                            var oldProductName = _context.Products.Where(p => p.Id == oldProduct.ProductId).Select(p => p.Name + "-" + p.Category).FirstOrDefault();
-                            innerLog.OldData = oldProductName;
-                        }
-                        if (innerLog.NewData != null)
-                        {
-                            var newProduct = JsonConvert.DeserializeObject<ProductECO>(innerLog.NewData);
-                            var newProductName = _context.Products.Where(p => p.Id == newProduct.ProductId).Select(p => p.Name + "-" + p.Category).FirstOrDefault();
-                            innerLog.NewData = newProductName;
-                        }
-                    }
-
-                    var Audit = new Audit()
-                    {
-                        UserName = log.value.FirstOrDefault().UserName,
-                        Action = log.value.FirstOrDefault().Action,
-                        TableName = "Product",
-                        EntityId = log.key.EntityId,
-                        OldData = string.Join(",", log.value.ToList().Where(g => g.OldData != null).Select(g => g.OldData)),
-                        NewData = string.Join(",", log.value.ToList().Where(g => g.NewData != null).Select(g => g.NewData)),
-                        CreatedOn = DateTime.Parse(log.key.Date)
-                    };
-                    logsFromAuditTable.Add(Audit);
-                }
-                #endregion
-
-                if (logsFromAuditTable.Count == 0)
-                {
-                    List<AuditLog> auditLogs = new List<AuditLog>();
-                    foreach (var log in auditLogRepository.GetAuditLogsECO(eCO.Id)) //sets a list of AuditLogs for the Partial
-                    {
-                        auditLogs.Add(log);
-                    }
-                    ViewData["AuditLogECO"] = auditLogs;
-                }
-                else
-                {
-                    ViewData["AuditLog"] = logsFromAuditTable;
-                }
-
-                #endregion
-
-                if (eCO == null)
-                {
-                    return NotFound();
-                }
 
                 return View(eCO);
             }
@@ -780,10 +369,18 @@ namespace Chnage.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Details([Bind("ApproverOption, UserRoleId, ChangeId, RejectReason")] ApproverViewModel vm) //when an approver chooses an option (Reject or Approve) for the Change
+        public async Task<IActionResult> Details([Bind("ApproverOption, UserRoleId, ChangeId, RejectReason, ApproverNote")] ApproverViewModel vm) //when an approver chooses an option (Reject or Approve) for the Change
         {
             try
             {
+                if (vm.ApproverOption == false)
+                {
+                    if (String.IsNullOrEmpty(vm.RejectReason))
+                    {
+                        TempData["RejectReasonEmpty"] = "Please enter a reason as to why you are rejecting this change.";
+                        return RedirectToAction("Details", new { id = vm.ChangeId });
+                    }
+                }
                 List<string> changes = new List<string>();
                 List<UserRoleECO> Approvers = middleTablesRepository.GetUserRolesForECO(vm.ChangeId).ToList(); //gets all approvers for the ECO
                 foreach (var approver in Approvers)
@@ -794,10 +391,22 @@ namespace Chnage.Controllers
                         //UserRoleECR that made the choice
                         existingUserRoleECO.Approval = vm.ApproverOption; //sets the approval to the option
                         existingUserRoleECO.AprovedDate = DateTime.Now.ToString();
+                        existingUserRoleECO.AproverNote = vm.ApproverNote;
                         _context.Update(existingUserRoleECO);
                         await _context.SaveChangesAsync();
                         string status = vm.ApproverOption == true ? "approved" : "rejected";
-                        changes.Add(loggedUser.Name + " has " + status + " The ECO");
+                        if (status == "approved")
+                        {
+                            var approval = "lightgreen";
+                            var message = "approved";
+                            changes.Add($" {loggedUser.Name} has <span style='background-color:{approval}'> {message}</span> the ECO");
+                        }
+                        else if (status == "rejected")
+                        {
+                            var rejected = "lightcoral";
+                            var message = "rejected";
+                            changes.Add($" {loggedUser.Name} has <span style='background-color:{rejected}'> {message}</span> the ECO");
+                        }
                     }
                 }
 
@@ -805,7 +414,11 @@ namespace Chnage.Controllers
 
                 StatusOptions currentStatus = currentECO.Status; //sets a log for the Status (in case it changes)
                 currentECO.RejectReason = vm.RejectReason;
-                if (Approvers.Any(a => a.Approval == null)) //if any of the approvers hasn't approved yet
+                if (Approvers.Any(a => a.UserRole.RoleInt == Role.Validator && a.Approval == null))
+                {
+                    currentECO.Status = StatusOptions.AwaitingValidation;
+                }
+                else //(Approvers.Any(a => a.Approval == null)) //if any of the approvers hasn't approved yet
                 {
                     currentECO.Status = StatusOptions.AwaitingApproval;
                 }
@@ -815,10 +428,12 @@ namespace Chnage.Controllers
                 if (val.Any(a => a.Approval == false)) //if any of the approvers rejected it, reject the change.
                 {
                     currentECO.Status = StatusOptions.RejectedValidation;
+                    currentECO.ClosedDate = DateTime.Now; //set the ClosedDate to now
                 }
                 else if (app.Any(a => a.Approval == false)) //if any of the approvers rejected it, reject the change.
                 {
                     currentECO.Status = StatusOptions.RejectedApproval;
+                    currentECO.ClosedDate = DateTime.Now; //set the ClosedDate to now
                 }
                 else if (Approvers.TrueForAll(a => a.Approval == true)) //if all the approvers approved it, approve the change.
                 {
@@ -836,7 +451,7 @@ namespace Chnage.Controllers
                     string CurrentBackgroundColor = "white";
                     string NewBackgroundColor = "white";
 
-                    if (currentStatus == StatusOptions.AwaitingApproval)
+                    if (currentStatus == StatusOptions.AwaitingApproval || currentStatus == StatusOptions.AwaitingValidation)
                     {
                         CurrentBackgroundColor = "orange";
                     }
@@ -852,7 +467,7 @@ namespace Chnage.Controllers
                     {
                         CurrentBackgroundColor = "white";
                     }
-                    if (currentECO.Status == StatusOptions.AwaitingApproval)
+                    if (currentECO.Status == StatusOptions.AwaitingApproval || currentStatus == StatusOptions.AwaitingValidation)
                     {
                         NewBackgroundColor = "orange";
                     }
@@ -982,7 +597,7 @@ namespace Chnage.Controllers
             viewModelError.ErrorId = Ex.HResult;
             viewModelError.ExceptionMessage = Ex.Message;
             viewModelError.ExceptionStackTrace = Ex.StackTrace;
-            viewModelError.Email = "shaifulullah@gmail.com";
+            viewModelError.Email = "rutvijsharma@geotab.com";
             viewModelError.ExceptionTypeString = Ex.GetType().FullName;
             viewModelError.ExceptionController = controller;
             viewModelError.ExceptionAction = action;
@@ -1024,17 +639,36 @@ namespace Chnage.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("PermanentChange,Description,ReasonForChange,ChangeTypeId,BOMRequired,ProductValidationTestingRequired,PlannedImplementationDate,CreatedDate,ClosedDate,CustomerApproval," +
-            "PriorityLevel,Originator,OriginatorId,ImplementationType,Status,NotesForApproverIds,NotesForValidatorIds,AreasAffected,UsersToBeNotified,RelatedECRIds,LinkUrls,AffectedProductsIds,PreviousRevision,NewRevision"+
-            "DeviationSelected","DeviationQuantity","DeviationDate")] ECOViewModel vmECO, string[] ApproversList, string[] ValidatorsList)
+            "PriorityLevel,Originator,OriginatorId,ImplementationType,Status,NotesForApproverIds,NotesForValidatorIds,AreasAffected,UsersToBeNotified,RelatedECRIds,LinkUrls,AffectedProductsIds,PreviousRevision,NewRevision," +
+            "DeviationSelected,DeviationQuantity,DeviationDate")] ECOViewModel vmECO, string[] ApproversList, string[] ValidatorsList)
         { //POST request with all values from the page
             if (ModelState.IsValid)
             {
                 try
                 {
                     vmECO.Originator = userRepository.GetUserFromId(vmECO.OriginatorId);
+
+                    if (vmECO.DeviationSelected == false)
+                    {
+                        vmECO.DeviationDate = null;
+                        vmECO.DeviationQuantity = null;
+                    }
+                    else if (vmECO.DeviationSelected)
+                    {
+                        if (!vmECO.Description.Contains("[Deviation]"))
+                        {
+                            vmECO.Description = "[Deviation] " + vmECO.Description;
+                        }
+                    }
+
+                    if (ValidatorsList != null && ValidatorsList.Length > 0)
+                    {
+                        vmECO.Status = StatusOptions.AwaitingValidation;
+                    }
                     ECO NewECO = new ECO(vmECO); //create a new ECO object from the values provided
+
                     _context.Add(NewECO); //add to the ChangeTracker
-                    await _context.SaveChangesAsync(); //save it to the database
+                    // await _context.SaveChangesAsync(); //save it to the database
 
                     int ECOId = NewECO.Id;
 
@@ -1059,8 +693,8 @@ namespace Chnage.Controllers
                     NewECO.AffectedProducts = affectedProducts;
 
                     //auditLogRepository.Add(NewECO, loggedUser);
-                    await _context.SaveChangesAsync();
-                    if (NewECO.Status != StatusOptions.Draft)
+                    //await _context.SaveChangesAsync();
+                    if (NewECO.Status != StatusOptions.Draft && NewECO.Status != StatusOptions.Template)
                     {
                         List<string> changes = new List<string>();
                         changes.Add($"ECO {NewECO.Id} has been created.");
@@ -1116,9 +750,11 @@ namespace Chnage.Controllers
         public List<ProductECO> SetAffectedProductsECO(List<int> ProductIds, int ECOId)
         {
             List<ProductECO> returnList = new List<ProductECO>();
+
             if (ProductIds != null && ProductIds.Count > 0)
             {
-                foreach (int productid in ProductIds) //for all the Ids in the List
+                var distinctProductIds = ProductIds.Distinct().ToList();
+                foreach (int productid in distinctProductIds) //for all the Ids in the List
                 {
                     ProductECO existingProdECO = middleTablesRepository.GetExistingProductECO(productid, ECOId); //get an existing productECO record if it already exists
                     if (existingProdECO != null)
@@ -1496,7 +1132,8 @@ namespace Chnage.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, [Bind("PermanentChange,ECRId,Description,ReasonForChange,ChangeTypeId,BOMRequired,ProductValidationTestingRequired,PlannedImplementationDate,ClosedDate,CustomerApproval," +
-            "PriorityLevel,ImplementationType,Status,NotesForApproverIds,NotesForValidatorIds,UsersToBeNotified,Id,AreasAffected,LinkUrls,RelatedECRIds,PreviousRevision,NewRevision,Originator,OriginatorId,AffectedProductsIds")] ECOViewModel vmECO,
+            "PriorityLevel,ImplementationType,Status,NotesForApproverIds,NotesForValidatorIds,UsersToBeNotified,Id,AreasAffected,LinkUrls,RelatedECRIds,PreviousRevision,NewRevision,Originator,OriginatorId,AffectedProductsIds,"+
+            "DeviationSelected,DeviationQuantity,DeviationDate")] ECOViewModel vmECO,
             string[] ApproversList, string[] ValidatorsList)
         { //POST method of the Edit Page
             if (id != vmECO.Id)
@@ -1517,6 +1154,30 @@ namespace Chnage.Controllers
                         .Include(e => e.RelatedECRs).ThenInclude(e => e.ECR)
                         .Single(); //gets the ECO from the database with all the related information from other tables too -> .Include().ThenInclude() -> Inner join basically
 
+                    if (vmECO.DeviationSelected == false)
+                    {
+                        vmECO.DeviationDate = null;
+                        vmECO.DeviationQuantity = null;
+                        if (vmECO.Description.Contains("[Deviation]"))
+                        {
+                            if (vmECO.Description.IndexOf("[Deviation]") > -1)
+                            {
+                                var indexOfDeviation = vmECO.Description.IndexOf("[Deviation]");
+                                if (indexOfDeviation == 0)
+                                {
+                                    var newDescription = vmECO.Description.Remove(indexOfDeviation, 11);
+                                    vmECO.Description = newDescription;
+                                }
+                            }
+                        }
+                    }
+                    else if (vmECO.DeviationSelected)
+                    {
+                        if (!vmECO.Description.Contains("[Deviation]"))
+                        {
+                            vmECO.Description = "[Deviation] " + vmECO.Description;
+                        }
+                    }
                     List<ECRHasECO> relatedECRListInVm = new List<ECRHasECO>();
 
                     if (vmECO.RelatedECRIds != null)
@@ -1573,7 +1234,7 @@ namespace Chnage.Controllers
 
                     await _context.SaveChangesAsync();
 
-                    if (existingECO.Status != StatusOptions.Draft)
+                    if (existingECO.Status != StatusOptions.Draft && existingECO.Status != StatusOptions.Template)
                     {
                         if (changes.Count > 0)
                         {
@@ -1622,7 +1283,7 @@ namespace Chnage.Controllers
 
         #endregion
 
-        #region Clone Rejected ECO
+        #region Clone Rejected ECO AND Create From Template
         public async Task<IActionResult> Clone(int? id) //display the Edit view
         {
             var eCO = await _context.ECOs
@@ -1663,6 +1324,10 @@ namespace Chnage.Controllers
 
             vm.Status = eCO.Status;
 
+            if (vm.Status == StatusOptions.Template)
+            {
+                ViewData["DisplayTemplateBtn"] = false;
+            }
             ViewData["AllUsers"] = SetSelectListForNotifications(vm);
             ViewData["OriginatorId"] = new SelectList(_context.Users.Where(u => u == loggedUser), "Id", "Name");
 
@@ -2472,6 +2137,10 @@ namespace Chnage.Controllers
             existingECO.PreviousRevision = vmECO.PreviousRevision;
             existingECO.NewRevision = vmECO.NewRevision;
             existingECO.LinkUrls = vmECO.LinkUrls;
+            existingECO.DeviationSelected = vmECO.DeviationSelected;
+            existingECO.DeviationQuantity = vmECO.DeviationQuantity;
+            existingECO.DeviationDate = vmECO.DeviationDate;
+            existingECO.ChangeTypeId = vmECO.ChangeTypeId;
             existingECO.AreasAffected = SetAreasAffectedECO(vmECO, existingId);
             UpdateRequestECOTable(SetAreasAffectedECO(vmECO, existingId), existingId); //call the method and not existingECO.AreasAffected because the changes were not saved yet
             existingECO.Notifications = SetNotificationsECO(vmECO, existingId, ApproversList, ValidatorsList);
@@ -2511,39 +2180,45 @@ namespace Chnage.Controllers
         #endregion
 
         #region Add/Remove To Nofication List
-        public async Task<IActionResult> AddToNotification(int id)
+
+        public IActionResult AddToNotifications(int id, ECO eco)
+        {
+            if (eco.UsersToBeAddedInNotification != null)
+            {
+                if (eco.UsersToBeAddedInNotification.Count > 0)
+                {
+                    foreach (var userId in eco.UsersToBeAddedInNotification)
+                    {
+                        User NotificationUser = _context.Users.Where(u => u.Id == userId).FirstOrDefault();
+                        Notifications NewNotification = new Notifications()
+                        {
+                            ECOId = id,
+                            UserId = userId,
+                            User = NotificationUser,
+                            Option = NotificationOption.AnyChange //the user will always be notified on any change, unless they change it in the main page
+                        };
+                        _context.Add(NewNotification);
+                        _context.SaveChanges();
+                    }
+                }
+            }
+
+            return RedirectToAction(nameof(Details), new { id = eco.Id });
+        }
+
+        public IActionResult RemoveFromNotifications(int id, ECO eco)
         {
             var loggedInUser = GetLoggedInUser();
             var notification = middleTablesRepository.GetNotificationByUserAndECO(loggedInUser.Id, id);
-
-            if (notification == null)
-            {
-                User NotificationUser = _context.Users.Where(u => u.Id == loggedInUser.Id).FirstOrDefault(); //get the User to access it's name later in the sendNotification
-                Notifications NewNotification = new Notifications()
-                {
-                    ECOId = id,
-                    UserId = loggedInUser.Id,
-                    User = NotificationUser,
-                    Option = NotificationOption.AnyChange //the user will always be notified on any change, unless they change it in the main page
-                };
-                _context.Add(NewNotification);
-                _context.SaveChanges();
-
-                //List<string> message = new List<string>();
-                //message.Add($"{loggedInUser.Name} has been added to the notification list");
-                //notificationSenderRepository.SendNotificationOnAnyChangeECO(id, message);
-            }
-            else
+            if (notification != null)
             {
                 var removeUser = _context.Notifications.Where(u => u.UserId == loggedInUser.Id && u.ECOId == id).FirstOrDefault();
                 _context.Notifications.RemoveRange(removeUser);
                 _context.SaveChanges();
-                //List<string> message = new List<string>();
-                //message.Add($"{loggedInUser.Name} has been removed from the notification list");
-                //notificationSenderRepository.SendNotificationOnAnyChangeECO(id, message);
+
             }
 
-            return RedirectToAction(nameof(Details), new { id = id });
+            return RedirectToAction(nameof(Details), new { id = eco.Id });
         }
         #endregion
 
@@ -2586,6 +2261,39 @@ namespace Chnage.Controllers
                     auditLogs.Add(log);
                 }
                 ViewData["AuditLog"] = auditLogs;
+
+                PartialViewAffectedProductsECO productList = new PartialViewAffectedProductsECO();
+                #region GET Not Affected Products
+
+                if (eCO.AffectedProducts.Count > 0)
+                {
+                    try
+                    {
+                        var affectedProductName = eCO.AffectedProducts.Select(g => new
+                        {
+                            ProductName = g.Product.Name,
+                            GroupName = g.Product.Name.Split("-")[0],
+                            Category = g.Product.Category
+                        }).ToList();
+
+                        var notAffectedProducts = _context.Products.Where(p => affectedProductName.Select(g => g.Category)
+                        .Contains(p.Category) && !affectedProductName.Any(x => x.ProductName.Equals(p.Name))).ToList();
+                        //.Where(p => affectedProductName.Any(x => x.GroupName.Equals(p.Name.Split("-")[0]))).ToList();
+
+
+                        productList.AffectedProducts = eCO.AffectedProducts;
+                        productList.NotAffectedProducts = notAffectedProducts;
+                        productList.Print = true;
+                        eCO.PartialViewAffectedProductsECO = productList;
+                    }
+                    catch (Exception ex)
+                    {
+                        ViewModelError vm = SetViewModelError(ex);
+                        return RedirectToAction("ErrorPage", "ErrorHandler", vm);
+                    }
+                }
+
+                #endregion
 
                 if (eCO == null)
                 {
@@ -2632,6 +2340,8 @@ namespace Chnage.Controllers
 
         }
         #endregion
+
+        #region Product Search feature for ECO and ECR
         public ActionResult Search(string searchTerm)
         {
             if (searchTerm != null)
@@ -2641,9 +2351,554 @@ namespace Chnage.Controllers
             }
             else
             {
-                return NotFound("Search string can not be empty");
+                return NotFound("Search text can not be empty");
             }
         }
+        #endregion
 
+        #region Generate Audit View
+        public ActionResult PopulateAuditView(int Id)
+        {
+            #region Populate Audit View
+
+            List<Audit> logsFromAuditTable = new List<Audit>();
+            AuditViewModel auditlog = new AuditViewModel();
+            var logId = Id;
+
+            #region Audit - Get ECO Table
+
+            var logList = _context.Audits.Where(e => e.TableName == "ECOs" && e.EntityId == logId.ToString()).ToList()
+                        .Where(g => g.OldData != g.NewData);
+
+            foreach (var log in logList)
+            {
+                if (log.TableName == "ECOs")
+                {
+                    if (log.OldData == null && log.NewData != null)
+                    {
+                        List<string> ecoLog = new List<string>();
+                        var newData = JsonConvert.DeserializeObject<ECO>(log.NewData);
+
+                        if (newData.ChangeTypeId != -1)
+                        {
+                            var changedType = _context.RequestTypes.Where(i => i.Id == newData.ChangeTypeId).Select(i => i.Name).FirstOrDefault();
+                            ecoLog.Add("ChangeType:" + changedType);
+                        }
+                        else
+                        { ecoLog.Add("ChangeType:null"); }
+
+                        if (newData.LinkUrls != null)
+                        {
+                            foreach (var links in newData.LinkUrls)
+                            {
+                                ecoLog.Add("LinkUrl:" + links.Value.ToString());
+                            }
+                        }
+                        else
+                        { ecoLog.Add("LinkUrl:null"); }
+
+                        if (newData.NotesForApprover != null)
+                        {
+                            foreach (var notes in newData.NotesForApprover)
+                            {
+                                ecoLog.Add("NotesForApprover:" + notes);
+                            }
+                        }
+                        else
+                        { ecoLog.Add("NotesForApprover:null"); }
+
+                        if (newData.NotesForValidator != null)
+                        {
+                            foreach (var notes in newData.NotesForValidator)
+                            {
+                                ecoLog.Add("NotesForValidator:" + notes);
+                            }
+                        }
+                        else
+                        { ecoLog.Add("NotesForValidator:null"); }
+
+                        if (newData.OriginatorId != -1)
+                        {
+                            var originatorName = _context.Users.Where(u => u.Id == newData.OriginatorId).Select(u => u.Name).FirstOrDefault();
+                            ecoLog.Add("OriginatorName:" + originatorName);
+                        }
+                        else
+                        { ecoLog.Add("OriginatorName:null"); }
+
+                        log.NewData = Helper.GetStructuredJsonInfo(newData);
+                        log.NewData += string.Join("<br/>", ecoLog);
+
+                    }
+                    if (log.Action == EntityState.Modified.ToString())
+                    {
+                        List<string> oldECOlog = new List<string>();
+                        List<string> newECOlog = new List<string>();
+                        var oldData = JsonConvert.DeserializeObject<ECO>(log.OldData);
+                        var newData = JsonConvert.DeserializeObject<ECO>(log.NewData);
+                        List<string> changedColumns = new List<string>();
+                        if (log.ChangedColumns != null)
+                        {
+
+                            changedColumns = log.ChangedColumns.Split(',').ToList();
+                        }
+                        //var changedColumns = log.ChangedColumns.Split(',').ToList();
+                        if (changedColumns != null)
+                        {
+                            if (changedColumns.Contains("LinkUrls"))
+                            {
+                                if (newData.LinkUrls != null)
+                                {
+                                    foreach (var links in newData.LinkUrls)
+                                    {
+                                        newECOlog.Add("LinkUrl:" + links.Value.ToString());
+                                    }
+                                }
+                                else
+                                { newECOlog.Add("LinkUrl: "); }
+
+                                if (oldData.LinkUrls != null)
+                                {
+                                    foreach (var links in oldData.LinkUrls)
+                                    {
+                                        oldECOlog.Add("LinkUrl:" + links.Value.ToString());
+                                    }
+                                }
+                                else
+                                { oldECOlog.Add("LinkUrl: "); }
+                            }
+                            if (changedColumns.Contains("NotesForApprover"))
+                            {
+                                if (newData.NotesForApprover != null)
+                                {
+                                    foreach (var notes in newData.NotesForApprover)
+                                    {
+                                        newECOlog.Add("NotesForApprover:" + notes);
+                                    }
+                                }
+                                else
+                                { newECOlog.Add("NotesForApprover: "); }
+
+                                if (oldData.NotesForApprover != null)
+                                {
+                                    foreach (var notes in newData.NotesForApprover)
+                                    {
+                                        oldECOlog.Add("NotesForApprover:" + notes);
+                                    }
+                                }
+                                else
+                                { oldECOlog.Add("NotesForApprover: "); }
+                            }
+                            if (changedColumns.Contains("NotesForValidator"))
+                            {
+                                if (newData.NotesForValidator != null)
+                                {
+                                    foreach (var notes in newData.NotesForValidator)
+                                    {
+                                        newECOlog.Add("NotesForValidator:" + notes);
+                                    }
+                                }
+                                else
+                                { newECOlog.Add("NotesForValidator: "); }
+
+                                if (oldData.NotesForValidator != null)
+                                {
+                                    foreach (var notes in newData.NotesForValidator)
+                                    {
+                                        oldECOlog.Add("NotesForValidator:" + notes);
+                                    }
+                                }
+                                else
+                                { oldECOlog.Add("NotesForValidator: "); }
+                            }
+                            if (changedColumns.Contains("ChangeTypeId"))
+                            {
+                                if (newData.ChangeTypeId != -1)
+                                {
+                                    var changedType = _context.RequestTypes.Where(i => i.Id == newData.ChangeTypeId).Select(i => i.Name).FirstOrDefault();
+                                    newECOlog.Add("ChangeType:" + changedType);
+                                }
+                                else
+                                { newECOlog.Add("ChangeType: "); }
+
+                                if (oldData.ChangeTypeId != -1)
+                                {
+                                    var changedType = _context.RequestTypes.Where(i => i.Id == oldData.ChangeTypeId).Select(i => i.Name).FirstOrDefault();
+                                    oldECOlog.Add("ChangeType:" + changedType);
+                                }
+                                else
+                                { oldECOlog.Add("ChangeType: "); }
+                            }
+                            if (changedColumns.Contains("OriginatorId"))
+                            {
+                                if (newData.OriginatorId != -1)
+                                {
+                                    var originatorName = _context.Users.Where(u => u.Id == newData.OriginatorId).Select(u => u.Name).FirstOrDefault();
+                                    newECOlog.Add("OriginatorName:" + originatorName);
+                                }
+                                else
+                                { newECOlog.Add("OriginatorName: "); }
+
+                                if (oldData.OriginatorId != -1)
+                                {
+                                    var originatorName = _context.Users.Where(u => u.Id == oldData.OriginatorId).Select(u => u.Name).FirstOrDefault();
+                                    oldECOlog.Add("OriginatorName:" + originatorName);
+                                }
+                                else
+                                { oldECOlog.Add("OriginatorName: "); }
+                            }
+                            log.OldData = Helper.GetStructuredJsonInfo(oldData, changedColumns);
+                            log.NewData = Helper.GetStructuredJsonInfo(newData, changedColumns);
+
+                            log.OldData += string.Join("<br/>", oldECOlog);
+                            log.NewData += string.Join("<br/>", newECOlog);
+                        }
+                    }
+                    log.TableName = "ECO";
+                }
+
+                logsFromAuditTable.Add(log);
+            }
+            #endregion
+
+            #region Audit - Get Related ECR
+            var relatedAuditECRs = _context.Audits.Where(e => e.TableName == "ECRHasECOs" && e.EntityId == logId.ToString()).ToList()
+            .Where(g => g.OldData != g.NewData).GroupBy(g => new
+            {
+                g.EntityId,
+                Date = g.CreatedOn.ToString("yyyy-MM-dd HH:mm:ss"),
+                g.Action
+            }).Select(g => new { key = g.Key, value = g.ToList() });
+
+            foreach (var relatedAuditECR in relatedAuditECRs)
+            {
+                foreach (var innerValue in relatedAuditECR.value)
+                {
+                    if (innerValue.OldData != null)
+                    {
+                        var oldData = JsonConvert.DeserializeObject<ECRHasECO>(innerValue.OldData);
+                        var ecrName = _context.ECRs.Where(e => e.Id == oldData.ECRId).Select(e => e.Description).FirstOrDefault();
+                        innerValue.OldData = ecrName;
+                    }
+                    if (innerValue.NewData != null)
+                    {
+                        var newData = JsonConvert.DeserializeObject<ECRHasECO>(innerValue.NewData);
+                        var ecrName = _context.ECRs.Where(e => e.Id == newData.ECRId).Select(e => e.Description).FirstOrDefault();
+                        innerValue.NewData = ecrName;
+                    }
+                }
+                var relatedECRAudit = new Audit()
+                {
+                    UserName = relatedAuditECR.value.FirstOrDefault().UserName,
+                    Action = relatedAuditECR.value.FirstOrDefault().Action,
+                    TableName = "Related ECR(s)",
+                    EntityId = relatedAuditECR.key.EntityId,
+                    OldData = string.Join("<br/>", relatedAuditECR.value.ToList().Where(g => g.OldData != null).Select(g => g.OldData)),
+                    NewData = string.Join("<br/>", relatedAuditECR.value.ToList().Where(g => g.NewData != null).Select(g => g.NewData)),
+                    CreatedOn = DateTime.Parse(relatedAuditECR.key.Date)
+                };
+                logsFromAuditTable.Add(relatedECRAudit);
+            }
+            #endregion
+
+            #region Audit - Get User Role Table
+
+            var userRoleECOLogList = _context.Audits.Where(e => e.TableName == "UserRoleECOs" && e.EntityId == logId.ToString()).ToList()
+            .Where(g => g.OldData != g.NewData).GroupBy(g => new
+            {
+                g.EntityId,
+                Date = g.CreatedOn.ToString("yyyy-MM-dd HH:mm:ss"),
+                g.Action
+
+            }).Select(g => new { key = g.Key, value = g.ToList() });
+            foreach (var userRoleLog in userRoleECOLogList)
+            {
+                foreach (var innerUserRoleLog in userRoleLog.value)
+                {
+                    if (innerUserRoleLog.OldData != null)
+                    {
+                        var oldRequest = JsonConvert.DeserializeObject<UserRoleECO>(innerUserRoleLog.OldData);
+                        var userId = _context.UserRoles.Where(u => u.Id == oldRequest.UserRoleId).Select(u => u.UserId).FirstOrDefault();
+                        var userName = _context.Users.Where(u => u.Id == userId).Select(u => u.Name).FirstOrDefault();
+                        var requestTypeId = _context.UserRoles.Where(u => u.Id == oldRequest.UserRoleId).Select(u => u.RequestTypeId).FirstOrDefault();
+                        var affectedArea = _context.RequestTypes.Where(r => r.Id == requestTypeId).Select(r => r.Name).FirstOrDefault();
+                        var userRoleType = _context.UserRoles.Where(u => u.Id == oldRequest.UserRoleId).Select(u => u.RoleInt).FirstOrDefault();
+                        string approvalStatus;
+                        if (oldRequest.Approval == true)
+                        {
+                            approvalStatus = "Approved";
+                        }
+                        else if (oldRequest.Approval == false)
+                        {
+                            approvalStatus = "Rejected";
+                        }
+                        else
+                        {
+                            approvalStatus = "Waiting";
+                        }
+                        var stringBuils = (userName + "-" + userRoleType + " for " + affectedArea + " ; " + "Approval Status: " + approvalStatus);
+                        innerUserRoleLog.OldData = stringBuils;
+                    }
+                    if (innerUserRoleLog.NewData != null)
+                    {
+                        var newRequest = JsonConvert.DeserializeObject<UserRoleECO>(innerUserRoleLog.NewData);
+                        var userId = _context.UserRoles.Where(u => u.Id == newRequest.UserRoleId).Select(u => u.UserId).FirstOrDefault();
+                        var userName = _context.Users.Where(u => u.Id == userId).Select(u => u.Name).FirstOrDefault();
+                        var requestTypeId = _context.UserRoles.Where(u => u.Id == newRequest.UserRoleId).Select(u => u.RequestTypeId).FirstOrDefault();
+                        var affectedArea = _context.RequestTypes.Where(r => r.Id == requestTypeId).Select(r => r.Name).FirstOrDefault();
+                        var userRoleType = _context.UserRoles.Where(u => u.Id == newRequest.UserRoleId).Select(u => u.RoleInt).FirstOrDefault();
+                        string approvalStatus;
+                        if (newRequest.Approval == true)
+                        {
+                            approvalStatus = "Approved";
+                        }
+                        else if (newRequest.Approval == false)
+                        {
+                            approvalStatus = "Rejected";
+                        }
+                        else
+                        {
+                            approvalStatus = "Waiting";
+                        }
+                        var stringBuild = (userName + "-" + userRoleType + " for " + affectedArea + " ; " + "Approval Status: " + approvalStatus);
+                        innerUserRoleLog.NewData = stringBuild;
+                    }
+                }
+                var UserRoleAudit = new Audit()
+                {
+                    UserName = userRoleLog.value.FirstOrDefault().UserName,
+                    Action = userRoleLog.value.FirstOrDefault().Action,
+                    TableName = "Approver",
+                    EntityId = userRoleLog.key.EntityId,
+                    OldData = string.Join("<br/>", userRoleLog.value.ToList().Where(g => g.OldData != null).Select(g => g.OldData)),
+                    NewData = string.Join("<br/>", userRoleLog.value.ToList().Where(g => g.NewData != null).Select(g => g.NewData)),
+                    CreatedOn = DateTime.Parse(userRoleLog.key.Date)
+                };
+                logsFromAuditTable.Add(UserRoleAudit);
+            }
+
+            #endregion 
+
+            #region Audit - Get Notification List
+            var notifications = _context.Notifications.Where(n => n.ECOId == logId).Select(x => x.Id.ToString()).ToList();
+            List<Audit> notificationLog = new List<Audit>();
+            var notificationList = _context.Audits.Where(x => notifications.Contains(x.EntityId) && x.TableName == "Notifications").ToList();
+
+            foreach (var notification in notificationList)
+            {
+
+                if (notification.NewData != null)
+                {
+                    var newNotification = JsonConvert.DeserializeObject<Notifications>(notification.NewData);
+                    var userName = _context.Users.Where(u => u.Id == newNotification.UserId).Select(u => u.Name).FirstOrDefault().ToString();
+                    notification.NewData = userName;
+                }
+
+                if (notification.OldData != null)
+                {
+                    var oldNotification = JsonConvert.DeserializeObject<Notifications>(notification.OldData);
+                    var oldUserName = _context.Users.Where(u => u.Id == oldNotification.UserId).Select(u => u.Name).FirstOrDefault().ToString();
+                    notification.OldData = oldUserName;
+                }
+
+                notificationLog.Add(notification);
+            }
+            var groupNotifications = notificationLog.GroupBy(g => new { Date = g.CreatedOn.ToString("yyyy-MM-dd HH:mm:ss"), g.Action }).ToList();
+            List<Audit> notificationForAudit = new List<Audit>();
+            foreach (var groupNotification in groupNotifications)
+            {
+                Audit notification = new Audit();
+                notification.CreatedOn = DateTime.Parse(groupNotification.Key.Date);
+                notification.UserName = groupNotification.FirstOrDefault().UserName;
+                notification.Action = groupNotification.Key.Action;
+                notification.OldData = string.Join("<br/>", groupNotification.Select(x => x.OldData));
+                notification.NewData = string.Join("<br/>", groupNotification.Select(x => x.NewData));
+                notification.TableName = groupNotification.FirstOrDefault().TableName;
+                notificationForAudit.Add(notification);
+            }
+
+            //logList = logList.Concat(notificationForAudit).OrderBy(e=>e.Id);
+            logsFromAuditTable = logsFromAuditTable.Concat(notificationForAudit).ToList();
+
+            #endregion
+
+            #region Audit - Get Request Type ECO// Areas Effected
+
+            var requestTypeECO = _context.Audits.Where(e => e.TableName == "RequestTypeECOs" && e.EntityId == logId.ToString()).ToList()
+                    .Where(g => g.OldData != g.NewData).GroupBy(g => new
+                    {
+                        g.EntityId,
+                        Date = g.CreatedOn.ToString("yyyy-MM-dd HH:mm:ss"),
+                        g.Action
+                    }).Select(g => new { key = g.Key, value = g.ToList() });
+
+            foreach (var log in requestTypeECO)
+            {
+                foreach (var innerLog in log.value)
+                {
+                    if (innerLog.OldData != null)
+                    {
+                        var oldRequest = JsonConvert.DeserializeObject<RequestTypeECO>(innerLog.OldData);
+                        var oldRequestType = _context.RequestTypes.Where(r => r.Id == oldRequest.RequestTypeId).Select(r => r.Name).FirstOrDefault();
+                        innerLog.OldData = oldRequestType;
+                    }
+                    if (innerLog.NewData != null)
+                    {
+                        var newRequest = JsonConvert.DeserializeObject<RequestTypeECO>(innerLog.NewData);
+                        var newRequestType = _context.RequestTypes.Where(r => r.Id == newRequest.RequestTypeId).Select(r => r.Name).FirstOrDefault();
+                        innerLog.NewData = newRequestType;
+                    }
+                }
+
+                var Audit = new Audit()
+                {
+                    UserName = log.value.FirstOrDefault().UserName,
+                    Action = log.value.FirstOrDefault().Action,
+                    TableName = "Affected Area(s)",
+                    EntityId = log.key.EntityId,
+                    OldData = (string.Join(",", log.value.ToList().Where(g => g.OldData != null).Select(g => g.OldData))),
+                    NewData = (string.Join(",", log.value.ToList().Where(g => g.NewData != null).Select(g => g.NewData))),
+                    CreatedOn = DateTime.Parse(log.key.Date)
+                };
+                logsFromAuditTable.Add(Audit);
+            }
+            #endregion
+
+            #region Audit - Get Affected Product List
+            var productECOLogList = _context.Audits.Where(e => e.TableName == "ProductECOs" && e.EntityId == logId.ToString()).ToList()
+                    .Where(g => g.OldData != g.NewData).GroupBy(g => new
+                    {
+                        g.EntityId,
+                        Date = g.CreatedOn.ToString("yyyy-MM-dd HH:mm:ss"),
+                        g.Action
+
+                    }).Select(g => new { key = g.Key, value = g.ToList() });
+
+            //.Select(x => new Audit { UserName = x.FirstOrDefault().UserName, Action = x.FirstOrDefault().Action, 
+            //    TableName = "ProductECO", EntityId = x.Key.EntityId, OldData = string.Join(":",x.ToList().Where(g=>g.OldData!=null).Select(g=>g.OldData)), 
+            //    NewData = string.Join(";",x.ToList().Select(g=>g.NewData)), CreatedOn = DateTime.Parse(x.Key.Date)}).ToList();
+            foreach (var log in productECOLogList)
+            {
+                foreach (var innerLog in log.value)
+                {
+                    if (innerLog.OldData != null)
+                    {
+                        var oldProduct = JsonConvert.DeserializeObject<ProductECO>(innerLog.OldData);
+                        var oldProductName = _context.Products.Where(p => p.Id == oldProduct.ProductId).Select(p => p.Name + "-" + p.Category).FirstOrDefault();
+                        innerLog.OldData = oldProductName;
+                    }
+                    if (innerLog.NewData != null)
+                    {
+                        var newProduct = JsonConvert.DeserializeObject<ProductECO>(innerLog.NewData);
+                        var newProductName = _context.Products.Where(p => p.Id == newProduct.ProductId).Select(p => p.Name + "-" + p.Category).FirstOrDefault();
+                        innerLog.NewData = newProductName;
+                    }
+                }
+
+                var Audit = new Audit()
+                {
+                    UserName = log.value.FirstOrDefault().UserName,
+                    Action = log.value.FirstOrDefault().Action,
+                    TableName = "Product",
+                    EntityId = log.key.EntityId,
+                    OldData = string.Join(",", log.value.ToList().Where(g => g.OldData != null).Select(g => g.OldData)),
+                    NewData = string.Join(",", log.value.ToList().Where(g => g.NewData != null).Select(g => g.NewData)),
+                    CreatedOn = DateTime.Parse(log.key.Date)
+                };
+                logsFromAuditTable.Add(Audit);
+            }
+            #endregion
+
+
+            if (logsFromAuditTable.Count == 0)
+            {
+                List<AuditLog> auditLogs = new List<AuditLog>();
+                foreach (var log in auditLogRepository.GetAuditLogsECO(Id)) //sets a list of AuditLogs for the Partial
+                {
+                    auditLogs.Add(log);
+                }
+                auditlog.AuditLogs = auditLogs;
+            }
+            else
+            {
+                auditlog.Audits = logsFromAuditTable;
+            }
+            return PartialView("PartialAuditLogForECOs", auditlog);
+            #endregion
+        }
+        #endregion
+
+        #region Generate Affected Product View
+        public ActionResult PopulateProductView(int id)
+        {
+            var eCO = _context.ECOs
+                .Include(e => e.ChangeType)
+                .Include(e => e.Originator)
+                .Include(e => e.AreasAffected)
+                    .ThenInclude(a => a.RequestType)
+                .Include(e => e.RelatedECRs)
+                    .ThenInclude(r => r.ECR)
+                .Include(e => e.Notifications)
+                    .ThenInclude(n => n.User)
+                .Include(e => e.Approvers)
+                    .ThenInclude(a => a.UserRole)
+                        .ThenInclude(u => u.User)
+                .Include(e => e.AffectedProducts)
+                    .ThenInclude(a => a.Product)
+                .FirstOrDefault(m => m.Id == id); //gets all the related information from the connecting tables
+            PartialViewAffectedProductsECO productList = new PartialViewAffectedProductsECO();
+            if (eCO == null)
+            {
+                return NotFound();
+            }
+
+            #region GET Not Affected Products
+
+            if (eCO.AffectedProducts.Count > 0)
+            {
+                try
+                {
+                    var affectedProductName = eCO.AffectedProducts.Select(g => new
+                    {
+                        ProductName = g.Product.Name,
+                        GroupName = g.Product.Name.Split("-")[0],
+                        Category = g.Product.Category
+                    }).ToList();
+
+                    var notAffectedProducts = _context.Products.Where(p => affectedProductName.Select(g => g.Category)
+                    .Contains(p.Category) && !affectedProductName.Any(x => x.ProductName.Equals(p.Name))).ToList();
+                    //.Where(p => affectedProductName.Any(x => x.GroupName.Equals(p.Name.Split("-")[0]))).ToList();
+
+
+                    productList.AffectedProducts = eCO.AffectedProducts;
+                    productList.NotAffectedProducts = notAffectedProducts;
+
+                    //eCO.PartialViewAffectedProductsECO = productList;
+                }
+                catch (Exception ex)
+                {
+                    ViewModelError vm = SetViewModelError(ex);
+                    return RedirectToAction("ErrorPage", "ErrorHandler", vm);
+                }
+            }
+
+            #endregion
+            return PartialView("PartialAffectedProductsECO", productList);
+
+        }
+        #endregion
+
+        #region Delete Template
+        public ActionResult DeleteTemplate(int id)
+        {
+            var eCO = _context.ECOs.FirstOrDefault(m => m.Id == id);
+
+            eCO.Status = StatusOptions.Delete;
+
+            _context.Update(eCO);
+            _context.SaveChanges();
+
+            return RedirectToAction("Main", "Home");
+        }
+        #endregion
     }
 }

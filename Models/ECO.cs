@@ -38,6 +38,9 @@ namespace Chnage.Models
             LinkUrls = vm.LinkUrls;
             PreviousRevision = vm.PreviousRevision;
             NewRevision = vm.NewRevision;
+            DeviationSelected = vm.DeviationSelected;
+            DeviationQuantity = vm.DeviationQuantity;
+            DeviationDate = vm.DeviationDate;
         }
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -116,5 +119,32 @@ namespace Chnage.Models
         public virtual ICollection<Notifications> Notifications { get; set; }
         public virtual List<AuditLog> AuditLogs { get; set; }
         public string RejectReason { get; set; }
+        [NotMapped]
+        [Display(Name = "Add user to notification list")]
+        public List<int> UsersToBeAddedInNotification { get; set; }
+        [NotMapped]
+        public Dictionary<string, Dictionary<string, Dictionary<Product, bool>>> NotAffectedProducts { get; set; }
+        [NotMapped]
+        public PartialViewAffectedProductsECO PartialViewAffectedProductsECO { get; set; }
+
+        [Display(Name = "Deviation")]
+        public bool DeviationSelected { get; set; }
+        [Display(Name = "Deviation Quantity")]
+        public int? DeviationQuantity { get; set; }
+        [Display(Name = "Deviation End Date")]
+        [DisplayFormat(ApplyFormatInEditMode = true, DataFormatString = "{0:yyyy/MM/dd}")]
+        public DateTime? DeviationDate { get; set; }
+    }
+    public class PartialViewAffectedProductsECO
+    {
+        public PartialViewAffectedProductsECO()
+        {
+            AffectedProducts = new List<ProductECO>();
+            NotAffectedProducts = new List<Product>();
+            Print = false;
+        }
+        public virtual ICollection<ProductECO> AffectedProducts { get; set; }
+        public virtual ICollection<Product> NotAffectedProducts { get; set; }
+        public bool Print { get; set; }
     }
 }

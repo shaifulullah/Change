@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Threading.Tasks;
 
+
 namespace Chnage.Models
 {
     public class UserRole
@@ -44,6 +45,7 @@ namespace Chnage.Models
         public ECR ECR { get; set; }
         public bool? Approval { get; set; }
         public string AprovedDate { get; set; }
+        public string AproverNote { get; set; }
     }
     public class UserRoleECO
     {
@@ -53,6 +55,7 @@ namespace Chnage.Models
         public ECO ECO { get; set; }
         public bool? Approval { get; set; }
         public string AprovedDate { get; set; }
+        public string AproverNote { get; set; }
     }
     public class UserRoleECN
     {
@@ -62,5 +65,6 @@ namespace Chnage.Models
         public ECN ECN { get; set; }
         public bool? Approval { get; set; }
         public string AprovedDate { get; set; }
+        public string AproverNote { get; set; }
     }
 }

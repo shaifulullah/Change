@@ -3,8 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Chnage.Models
 {
@@ -31,6 +29,9 @@ namespace Chnage.Models
             Originator = vm.Originator;
             OriginatorId = vm.OriginatorId;
             Status = vm.Status;
+            DeviationSelected = vm.DeviationSelected;
+            DeviationQuantity = vm.DeviationQuantity;
+            DeviationDate = vm.DeviationDate;
         }
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -45,6 +46,7 @@ namespace Chnage.Models
         [DisplayFormat(ApplyFormatInEditMode = true, DataFormatString = "{0:yyyy/MM/dd HH:mm:ss}")]
         public DateTime CreatedDate { get; set; } = DateTime.Now;
         [DisplayFormat(ApplyFormatInEditMode = true, DataFormatString = "{0:yyyy/MM/dd HH:mm:ss}")]
+        [Display(Name = "Closed Date")]
         public DateTime? ClosedDate { get; set; }
         public User Originator { get; set; }
         public int OriginatorId { get; set; }
@@ -54,9 +56,9 @@ namespace Chnage.Models
         public int ChangeTypeId { get; set; }
         [Display(Name = "PTCRB Resubmission Required"), Required]
         public bool PTCRBResubmissionRequired { get; set; }
-        [Display(Name = "Current Firmware Version"), Required]
+        [Display(Name = "Current Revision"), Required]
         public string CurrentFirmwareVersion { get; set; }
-        [Display(Name = "New Firmware Version"), Required]
+        [Display(Name = "New Revision"), Required]
         public string NewFirmwareVersion { get; set; }
         [Required]
         public string Description { get; set; }
@@ -69,6 +71,17 @@ namespace Chnage.Models
         public string RejectReason { get; set; }
         [Display(Name = "Related ECO Ids")]
         public virtual ICollection<ECNHasECO> RelatedECOs { get; set; }
+        [NotMapped]
+        [Display(Name = "Add user to notification list")]
+        public List<int> UsersToBeAddedInNotification { get; set; }
+
+        [Display(Name = "Deviation")]
+        public bool DeviationSelected { get; set; }
+        [Display(Name = "Deviation Quantity")]
+        public int? DeviationQuantity { get; set; }
+        [DisplayFormat(DataFormatString = "{0:yyyy/MM/dd HH:mm:ss}")]
+        [Display(Name = "Deviation End Date")]
+        public DateTime? DeviationDate { get; set; }
     }
     public class ECNHasECO
     {

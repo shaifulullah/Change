@@ -66,6 +66,14 @@
                             </label>
                         </div>
                     </div>
+                    <div class="form-group">
+                        <div class="checkbox">
+                            <label>
+                                @Html.CheckBoxFor(m => Model.DeviationSelected, new { value = Model.DeviationSelected, @class = "Deviation" })
+                                Deviation
+                            </label>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-md-2">
                     <div class="form-group">
@@ -84,31 +92,25 @@
                     </div>
                 </div>
             </div>
+
             <div class="row">
-                <div class="col-md-12">
-                    <div class="col-md-4 form-group">
-                        <label class="btn btn-primary" style="margin-bottom:5px">
-                            @Html.CheckBoxFor(m => Model.DeviationSelected, new { value = Model.DeviationSelected, @class = "Deviation" })
-                            Deviation
-                        </label>
-                    </div>
-                    <div class="col-md-8" id="deviationDetails">
-                        <div class="col-md-4">
-                            <label asp-for="DeviationQuantity" class="control-label"></label>
-                            <input type="text" asp-for="DeviationQuantity" placeholder="Quantity (number only)" class="form-control numericOnly" />
-                            <span asp-validation-for="DeviationQuantity" class="text-danger"></span>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="form-group">
-                                <label asp-for="DeviationDate" class="control-label"></label>
-                                <input asp-for="DeviationDate" type="date" class="form-control" />
-                                <span asp-validation-for="DeviationDate" class="text-danger"></span>
-                            </div>
-                        </div>
-                    </div>
+                <div class="col-md-8">
 
                 </div>
+                <div id="deviationDetails">
+                    <div class="col-md-2 form-group">
+                        <label asp-for="DeviationQuantity" class="control-label"></label>
+                        <input type="text" asp-for="DeviationQuantity" placeholder="Quantity (number only)" class="form-control numericOnly" />
+                        <span asp-validation-for="DeviationQuantity" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-2 form-group">
+                        <label asp-for="DeviationDate" class="control-label"></label>
+                        <input asp-for="DeviationDate" type="date" class="form-control" />
+                        <span asp-validation-for="DeviationDate" class="text-danger"></span>
+                    </div>
+                </div>
             </div>
+
             <div class="row">
                 <div class="col-md-6">
                     <div class="form-group">
@@ -269,13 +271,24 @@
                         <select asp-items="Model.RelatedECRs" asp-for="RelatedECRIds" class="form-control SelectControl" multiple="multiple"></select>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <div class="form-group">
                         <label>&nbsp;</label>
                         <input type="button" value="Save as Draft" class="btn btn-block btn-default" id="btnSave" />
                     </div>
                 </div>
-                <div class="col-md-3">
+                @if (ViewBag.DisplayTemplateBtn == null || ViewBag.DisplayTemplateBtn == true)
+                {
+                    <div class="col-md-2">
+                        <div class="form-group">
+                            <label>&nbsp;</label>
+                            <input type="button" value="Save as Template" class="btn btn-block btn-info" id="btnTemplate" />
+                            @*<input type="submit" asp-action="Create" asp-controller="ECOs"  value="Save as Template" class="btn btn-block btn-info" id="btnTemplate" />*@
+                        </div>
+                    </div>
+                }
+
+                <div class="col-md-2">
                     <div class="form-group">
                         <label>&nbsp;</label>
                         <input type="button" value="Create" class="btn btn-block btn-success" id="btnSubmit" />
@@ -298,16 +311,41 @@
 
 </form>
 
+<!-- JS link for Block UI-->
+<script src="~/js/jquery.blockUI.js"></script>
 <script>
     $(function () {
         $('#btnSubmit').click(function myfunction() { //when the Create btn is clicked
-            //$("#Status option").removeAttr("selected"); //reset the status option
-            //$("#Status option[value='3']").attr("selected", "selected"); //set the status to the option 3, which is awaiting approval
+            $.blockUI({
+                message: '<h1><img src="/images/wait.gif"/></h1',
+                css: {
+                    top: ($(window).height() - 400) / 2 + 'px',
+                    left: ($(window).width() - 600) / 2 + 'px',
+                    backgroundColor: 'transparent',
+                    border: '0'
+                }
+            });
             checkECOUserInputs(this); //checks for the inputs in the form
+            $.ajax({
+                url: '/ECOs/Create',
+                type: 'post',
+                data: {
+                    Id: ecoId
+                },
+                success: function (response) {
+                    $.unblockUI();
+                },
+                error: function (errorMsg) {
+                    alert(errorMsg.responseText);
+                }
+            });
         })
         $("#btnSave").click(function () { //same thing as above
             //$("#Status option").removeAttr("selected");
             //$("#Status option[value='0']").attr("selected", "selected"); //but sets the status option to 0, which is Draft
+            checkECOUserInputs(this);
+        })
+        $("#btnTemplate").click(function () { //same thing as above
             checkECOUserInputs(this);
         })
     })

@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace Chnage.ViewModel.ECR
 {
-    public class ECRViewModel 
+    public class ECRViewModel
     {
         public int Id { get; set; }
         [Display(Name = "Permanent Change"), Required]
@@ -18,7 +18,7 @@ namespace Chnage.ViewModel.ECR
         public List<Notifications> Notifications { get; set; }
         public User Originator { get; set; }
         public int OriginatorId { get; set; }
-        [Display (Name = "Affected Products")]
+        [Display(Name = "Affected Products")]
         public List<ProductECR> AffectedProducts { get; set; }
         public List<int> AffectedProductsIds { get; set; }
 
@@ -30,7 +30,7 @@ namespace Chnage.ViewModel.ECR
 
         [Display(Name = "Change Type")]
         public virtual RequestType ChangeType { get; set; }
-        [Display(Name ="Change Type"), Required]
+        [Display(Name = "Change Type"), Required]
         public int ChangeTypeId { get; set; }
 
         [Display(Name = "Areas Affected by Change"), Required]
@@ -49,10 +49,10 @@ namespace Chnage.ViewModel.ECR
         public bool CustomerImpact { get; set; }
 
         [Display(Name = "Priority Level"), Required]
-        public PriorityLevel PriorityLevel { get; set; }        
+        public PriorityLevel PriorityLevel { get; set; }
 
         public List<UserRoleECR> Approvers { get; set; }
-        public List<SelectList> ApproversList { get; set; }        
+        public List<SelectList> ApproversList { get; set; }
 
         [Display(Name = "Implementation Type"), Required]
         public ImpType ImplementationType { get; set; }
@@ -63,11 +63,19 @@ namespace Chnage.ViewModel.ECR
         public string NewRevision { get; set; }
 
         [Display(Name = "Links")]
-        public Dictionary<string,string> LinkUrls { get; set; }
+        public Dictionary<string, string> LinkUrls { get; set; }
         public Dictionary<string, Dictionary<string, Dictionary<Product, bool>>> ProductList { get; set; }
         public StatusOptions Status { get; set; }
         //[Display(Name = "all ECOs approved")]
         //public bool ECOsCompleted { get; set; }
+
+        [Display(Name = "Deviation")]
+        public bool DeviationSelected { get; set; }
+        [Display(Name = "Deviation Quantity")]
+        public int? DeviationQuantity { get; set; }
+        [Display(Name = "Deviation End Date")]
+        public DateTime? DeviationDate { get; set; }
+
         public ECRViewModel(Models.ECR ecr)
         {
             Id = ecr.Id;
@@ -95,6 +103,9 @@ namespace Chnage.ViewModel.ECR
             ProductValidationTestingRequired = ecr.ProductValidationTestingRequired;
             Notifications = ecr.Notifications.ToList();
             LinkUrls = ecr.LinkUrls;
+            DeviationSelected = ecr.DeviationSelected;
+            DeviationQuantity = ecr.DeviationQuantity;
+            DeviationDate = ecr.DeviationDate;
         }
 
         public ECRViewModel()

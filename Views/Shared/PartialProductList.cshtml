@@ -1,4 +1,5 @@
 ﻿@model Dictionary<string, Dictionary<string, Dictionary<Product, bool>>>
+
 <div class="row">
     <div class="col-md-12">
         <br />
@@ -6,11 +7,12 @@
             <div class="col-md-3">
                 <input type="text" name="name" class="form-control" id="searchText" />
             </div>
+
             <div class="col-md-1">
                 <input type="button" value="Search" class="btn btn-info" id="searchBtn" />
             </div>
             <div class="col-md-2">
-                <input type="button" value="Clear Search" class="btn btn-warning" id="clearBtn" />
+                @*<input type="button" value="Clear Search" class="btn btn-warning" id="clearBtn" />*@
             </div>
         </div>
         <h3>
@@ -33,7 +35,7 @@
     <div class="col-md-12">
         <h3>Selected Products:</h3>
         <div class="hidden" id="selectedProductsDiv">
-            <label id="selectedlabel">Selected products from search</label>
+            <label id="selectedlabel">Selected products from previous search</label>
             <ul class="list-inline">
                 <li class="prodList" style="border: 1px solid rgba(9, 0, 90, 0.75);border-radius: 4px;padding: 6px 12px; margin:5px;">
                     <label id="innerLabel">
@@ -51,6 +53,7 @@
                 </li>
             </ul>
         </div>
+
         <div class="hidden" id="searchProducts">
             <label id="label"></label>
             <ul class="list-inline">
@@ -70,6 +73,7 @@
                 </li>
             </ul>
         </div>
+
         @foreach (var categories in Model)
         {
             <div class="hidden" name="@categories.Key">
@@ -146,6 +150,7 @@
         }
     </div>
 </div>
+
 <script>
     $('#clearBtn').click(function () {
         $('#searchedProducts').empty();
@@ -167,7 +172,7 @@
                     var allListItems = $('#searchedProducts > li');
                     $('#searchedProducts').empty();
                     $('#label').append('Search Result for: ' + $('#searchText').val());
-                    
+
 
                     $.each(allListItems, function () {
                         var ischecked = false;
@@ -188,15 +193,14 @@
 
                     //$('#innerLabel').append($('#searchText').val());
                     $(response.result).each(function (i, item) {
-                        console.log(i);
-                       var liInput = "<li style='padding:5px;'>"+
-                                                "<label class='btn btn-default'>"+
-                                                    "<input class='checkboxProduct' type='checkbox' value='"+  item.id  +"' name='AffectedProductsIds'/>"+
-                                                    "<span style='padding:5px;'>"+
-                                                       item.name
-                                                    +"</span>"+
-                                                "</label>"+
-                                            "</li>";
+                        var liInput = "<li style='padding:5px;'>" +
+                            "<label class='btn btn-default'>" +
+                            "<input class='checkboxProduct' type='checkbox' value='" + item.id + "' name='AffectedProductsIds'/>" +
+                            "<span style='padding:5px;'>" +
+                            item.name
+                            + "</span>" +
+                            "</label>" +
+                            "</li>";
                         $('#searchedProducts').append(liInput);
                     })
                     if (div.hasClass('hidden')) {
@@ -209,6 +213,8 @@
             }
         })
     })
+
+
     $(function () {
         var HiddenDiv = $(".checkboxProduct:checked").parents(".hidden");
         HiddenDiv.removeClass("hidden");
