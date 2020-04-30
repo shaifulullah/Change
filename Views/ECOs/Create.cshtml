@@ -4,6 +4,7 @@
     Layout = "_Layout";
     ViewData["Title"] = "Create ECO";
 }
+
 <div class="row text-center">
     <div class="col-md-12">
         <h2>Create Engineering Change Order</h2>
@@ -260,8 +261,15 @@
             <div class="row">
                 <div class="col-md-3">
                     <div class="form-group">
-                        <label asp-for="UsersToBeNotified">Send Notifications to:</label>
+                        <label asp-for="UsersToBeNotified">Send Notifications to</label>
                         <select title="To select multiple users press the control key and click on the users" asp-for="UsersToBeNotified" class="form-control SelectControl" asp-items="ViewBag.AllUsers" multiple="multiple"></select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label asp-for="EmailsToBeNotified">Notify by email</label>
+                        <select id="EmailsToBeNotified" name="EmailsToBeNotified" multiple="multiple"
+                                class="form-control selectListTest"> </select>
                     </div>
                 </div>
                 <div class="col-md-3">
@@ -271,6 +279,9 @@
                         <select asp-items="Model.RelatedECRs" asp-for="RelatedECRIds" class="form-control SelectControl" multiple="multiple"></select>
                     </div>
                 </div>
+            </div>
+            <div class="row">
+                <div class="col-md-2"></div>
                 <div class="col-md-2">
                     <div class="form-group">
                         <label>&nbsp;</label>
@@ -311,34 +322,12 @@
 
 </form>
 
-<!-- JS link for Block UI-->
-<script src="~/js/jquery.blockUI.js"></script>
 <script>
     $(function () {
         $('#btnSubmit').click(function myfunction() { //when the Create btn is clicked
-            $.blockUI({
-                message: '<h1><img src="/images/wait.gif"/></h1',
-                css: {
-                    top: ($(window).height() - 400) / 2 + 'px',
-                    left: ($(window).width() - 600) / 2 + 'px',
-                    backgroundColor: 'transparent',
-                    border: '0'
-                }
-            });
+            //$("#Status option").removeAttr("selected"); //reset the status option
+            //$("#Status option[value='3']").attr("selected", "selected"); //set the status to the option 3, which is awaiting approval
             checkECOUserInputs(this); //checks for the inputs in the form
-            $.ajax({
-                url: '/ECOs/Create',
-                type: 'post',
-                data: {
-                    Id: ecoId
-                },
-                success: function (response) {
-                    $.unblockUI();
-                },
-                error: function (errorMsg) {
-                    alert(errorMsg.responseText);
-                }
-            });
         })
         $("#btnSave").click(function () { //same thing as above
             //$("#Status option").removeAttr("selected");

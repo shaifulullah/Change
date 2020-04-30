@@ -134,6 +134,8 @@ namespace Chnage.Models
         [Display(Name = "Deviation End Date")]
         [DisplayFormat(ApplyFormatInEditMode = true, DataFormatString = "{0:yyyy/MM/dd}")]
         public DateTime? DeviationDate { get; set; }
+        [NotMapped]
+        public List<string> EmailsToBeNotified { get; set; }
     }
     public class PartialViewAffectedProductsECO
     {

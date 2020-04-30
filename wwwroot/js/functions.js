@@ -43,6 +43,14 @@ function checkECOUserInputs(x) { //this will check for the inputs of the user
     //this will check for the checkbox for the affected areas, returning true if they are selected or null if not;
     $(".AreaCheckbox").each(function () { if ($(this).prop("checked")) { areasChecked = true; return false; } else { areasChecked = null; } })
     $(".Deviation").each(function () { if ($(this).prop("checked")) { deviationChecked = true; return false; } else { deviationChecked = null; } })
+    $("#EmailsToBeNotified").each(function () {
+        if ($(this).val().length > 0) {
+            console.log("email addresses are " + $(this).val())
+        }
+        else {
+
+        }
+    })
     var Fields = { //these are the fields that will be checked.
         "Change Type": $("#ChangeTypeId").val() !== null ? $("#ChangeTypeId").val() : null, //simple check if the value is null, returning the value or null
         "Priority Level": $("#PriorityLevel").val() !== null ? $("#PriorityLevel").val() : null,
@@ -60,6 +68,7 @@ function checkECOUserInputs(x) { //this will check for the inputs of the user
         "Areas Affected": areasChecked, //if any Area has been checked, return the value or null
         "Approvers": $(aList).find("option:selected").length, //gets how many approvers were selected
         "Notifications": $('#UsersToBeNotified').val().length > 0 ? $("#UsersToBeNotified").val().length : null // same as above but with notifications, returning null if < 0
+        //"Email Notifications": $('#EmailsToBeNotified').val().length > 0 ? $("#EmailsToBeNotified").val().length : null // same as above but with notifications, returning null if < 0
 
     };
     console.log("Areas Affected: " + Fields["Areas Affected"])
@@ -80,6 +89,7 @@ function checkECOUserInputs(x) { //this will check for the inputs of the user
             list.append(DeviationItem)
         }
     }
+
     for (var field in Fields) { //loops through the fields
         if (Fields.hasOwnProperty(field)) {
             var fieldValue = Fields[field]; //the value in the field
@@ -962,6 +972,12 @@ $(function () {
         width: 'element',
         allowClear: true //allow X button to clear
     })
+    $(".selectListTest").select2({
+        placeholder: 'Type email and press enter',
+        width: 'element',
+        allowClear: true,
+        tags: true
+    });
     //$('.LinksSelectControl').select2({ //this is interesting if you want to allow the user to type links as they go into a select2 control
     //    tags:true,
     //    createTag: function (params) {

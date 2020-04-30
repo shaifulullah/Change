@@ -127,7 +127,7 @@ namespace Chnage.ViewModel.ECO
         public int? DeviationQuantity { get; set; }
         [Display(Name = "Deviation Ends Date"), Required]
         public DateTime? DeviationDate { get; set; }
-
+        public List<string> EmailsToBeNotified { get; set; }
     }
     public class RequestTypeChangeCheckBox
     {

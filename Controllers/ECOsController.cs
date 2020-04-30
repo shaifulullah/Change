@@ -640,7 +640,7 @@ namespace Chnage.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("PermanentChange,Description,ReasonForChange,ChangeTypeId,BOMRequired,ProductValidationTestingRequired,PlannedImplementationDate,CreatedDate,ClosedDate,CustomerApproval," +
             "PriorityLevel,Originator,OriginatorId,ImplementationType,Status,NotesForApproverIds,NotesForValidatorIds,AreasAffected,UsersToBeNotified,RelatedECRIds,LinkUrls,AffectedProductsIds,PreviousRevision,NewRevision," +
-            "DeviationSelected,DeviationQuantity,DeviationDate")] ECOViewModel vmECO, string[] ApproversList, string[] ValidatorsList)
+            "DeviationSelected,DeviationQuantity,DeviationDate,EmailsToBeNotified")] ECOViewModel vmECO, string[] ApproversList, string[] ValidatorsList)
         { //POST request with all values from the page
             if (ModelState.IsValid)
             {
